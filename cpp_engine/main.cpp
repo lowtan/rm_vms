@@ -27,7 +27,8 @@ int main() {
                 Log::info("{\"status\":\"starting\", \"cam\":" + idStr + "}");
 
                 // Run logic
-                startIngestion(std::stoi(idStr), url);
+                // startIngestion(std::stoi(idStr), url);
+                VideoIngestion cam1(std::stoi(idStr), url);
 
             } catch (...) {
                 Log::error("Error parsing command");
