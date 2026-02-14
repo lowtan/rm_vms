@@ -1,14 +1,11 @@
 #include "Log.h"
 #include <iostream>
+#include <cstdarg> // Required for va_list, va_start
+#include <vector>
+#include <cstring> // for strerror
 
-// // Simple logging helper to Stderr (so it doesn't mess up JSON on Stdout)
-// void log(const std::string& msg) {
-//     std::cout << "[cpp_engine] " << msg << std::endl;
-// }
-
-// void logErr(const std::string& msg) {
-//     std::cerr << "[cpp_engine][err] " << msg << std::endl;
-// }
+// Initialize the mutex
+std::mutex Log::s_Mutex;
 
 void Log::info(const std::string& msg) {
 
@@ -23,4 +20,48 @@ void Log::info(const std::string& msg) {
 void Log::error(const std::string& msg) {
     std::lock_guard<std::mutex> lock(s_Mutex);
     std::cerr << "[cpp_engine][err] " << msg << std::endl;
+}
+
+// "Printf-style" version
+void Log::error(const char* format, ...) {
+    // A fixed buffer is usually sufficient for log lines (fast stack allocation)
+    char buffer[2048]; 
+
+    // Initialize the variable argument list
+    va_list args;
+    va_start(args, format);
+
+    // Format the string into the buffer
+    // vsnprintf protects against buffer overflow
+    vsnprintf(buffer, sizeof(buffer), format, args);
+
+    // Clean up the list
+    va_end(args);
+
+    Log::error(buffer);
+    // // Reuse the thread-safe logic
+    // // We can just call the other overload or print directly
+    // std::lock_guard<std::mutex> lock(s_Mutex);
+    // std::cerr << "[cpp_engine][err] " << buffer << std::endl;
+}
+
+// Replacement for standard perror
+void Log::PError(const std::string& prefix) {
+    // buffer for the error message
+    char errBuf[256]; 
+    
+    // standard, thread-safe way to get the error string
+    // XSI-compliant strerror_r returns int
+    // GNU-specific strerror_r returns char*
+    // We use the safer, portable C++11 approach or standard POSIX:
+    
+    #if (_POSIX_C_SOURCE >= 200112L) && !  _GNU_SOURCE
+        strerror_r(errno, errBuf, sizeof(errBuf));
+        // Now log it using YOUR standard formatting
+        Log::error("%s: %s", prefix.c_str(), errBuf); 
+    #else
+        // Fallback or GNU specific if needed, but often just:
+        strerror_r(errno, errBuf, sizeof(errBuf));
+        Log::error("%s: %s", prefix.c_str(), errBuf);
+    #endif
 }

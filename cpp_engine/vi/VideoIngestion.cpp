@@ -4,9 +4,10 @@
 // #include <string>
 #include <chrono>
 
-
 #include "Log.h"
+#include "SharedMemory.h"
 
+const std::unique_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
 
 /**
  * Checks for any options that FFmpeg did NOT consume.
@@ -72,10 +73,10 @@ int VideoIngestion::startIngestion() {
             }
 
             if (videoStreamIndex == -1) {
+
                 std::cerr << "No video stream found." << std::endl;
 
             } else {
-
 
                 Log::info("Connected! Starting Ingestion Loop...");
                 Log::info("{CamID: " + std::to_string(camID) + ", Status: 1}");
@@ -99,14 +100,22 @@ int VideoIngestion::startIngestion() {
 
                     // == Filter: Only process packets belonging to the video stream
                     if (packet->stream_index == videoStreamIndex) {
-                        
+
+                        bool isKey = false;
+
                         // Check if it's a Keyframe (I-Frame)
                         if (packet->flags & AV_PKT_FLAG_KEY) {
                             std::cout << "Found Keyframe! Size: " << packet->size << std::endl;
+                            isKey = true;
                         }
 
                         // Push to Ring Buffer
                         // PushToSharedMemory(packet->data, packet->size, packet->pts);
+                        if(SHM->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
+
+                            Log::error("Failed to write frame data for cam:" + std::to_string(camID));
+
+                        }
 
                         // Write to Disk (Muxing)
                         // WriteToFile(packet);

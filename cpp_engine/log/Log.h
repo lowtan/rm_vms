@@ -14,6 +14,8 @@ class Log {
 public:
     static void info(const std::string& msg);
     static void error(const std::string& msg);
+    static void error(const char* format, ...);
+    static void PError(const std::string& prefix);
 
 private:
     // A single shared lock for the entire application
