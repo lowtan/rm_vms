@@ -17,14 +17,16 @@ link_directories(${AVCODEC_LIBRARY_DIRS} ${AVFORMAT_LIBRARY_DIRS} ${AVUTIL_LIBRA
 file(GLOB_RECURSE VI_CPP "vi/*.cpp")
 file(GLOB_RECURSE LOG_CPP "log/*.cpp")
 file(GLOB_RECURSE MEMORY_CPP "memory/*.cpp")
+file(GLOB_RECURSE UTILS_CPP "utils/*.cpp")
 # file(GLOB_RECURSE RECRDR_CPP "storage/*.cpp")
 
-add_executable(nvr_worker main.cpp ${VI_CPP} ${LOG_CPP} ${MEMORY_CPP})
+add_executable(nvr_worker main.cpp ${VI_CPP} ${LOG_CPP} ${UTILS_CPP} ${MEMORY_CPP})
 
 # Header search folders
 target_include_directories(nvr_worker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
                         ${CMAKE_CURRENT_SOURCE_DIR}/vi
                         ${CMAKE_CURRENT_SOURCE_DIR}/log
+                        ${CMAKE_CURRENT_SOURCE_DIR}/utils
                         ${CMAKE_CURRENT_SOURCE_DIR}/memory
                         )
 

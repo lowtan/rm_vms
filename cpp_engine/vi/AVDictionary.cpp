@@ -28,12 +28,12 @@ AVDictionary* configureAVDictionary(AVDictionary* options) {
     // Default is ~5MB. FFmpeg reads this much data just to guess the format.
     // 64 cams * 5MB = 320MB of RAM spiked just to connect.
     // Reduce to 32KB (usually enough for H.264 RTSP headers).
-    av_dict_set(&options, "probesize", "32768", 0); 
+    av_dict_set(&options, "probesize", "64768", 0); 
 
     // Analyze Duration (in microseconds).
     // How long to watch the stream to detect frame rate/resolution.
     // Default is 5 seconds. Reduce to 0.5 or 1 second.
-    av_dict_set(&options, "analyzeduration", "500000", 0); 
+    av_dict_set(&options, "analyzeduration", "2000000", 0); 
 
 
     // ---  LATENCY REDUCTION ---

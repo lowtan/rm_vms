@@ -15,6 +15,7 @@ class VideoIngestion
 {
 private:
     int camID;
+    std::string camName;
     std::string url;
 
     // These vars should be initialized at startIngestion()
