@@ -38,7 +38,7 @@ int main() {
                     Log::info("id, url:" + idStr + " " + url );
 
                     // Respond to Go
-                    Log::info("{\"status\":\"starting\", \"cam\":" + idStr + "}");
+                    Log::send("{\"status\":\"starting\", \"cam\":" + idStr + "}");
 
                     // Run logic
                     int camID = std::stoi(idStr);

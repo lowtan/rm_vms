@@ -12,6 +12,7 @@
 
 class Log {
 public:
+    static void send(const std::string& msg);
     static void info(const std::string& msg);
     static void error(const std::string& msg);
     static void error(const char* format, ...);

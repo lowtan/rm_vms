@@ -79,7 +79,7 @@ int VideoIngestion::startIngestion() {
             } else {
 
                 Log::info(camName + "Connected! Starting Ingestion Loop...");
-                Log::info("{CamID: " + std::to_string(camID) + ", Status: 1}");
+                Log::send("{CamID: " + std::to_string(camID) + ", Status: 1}");
 
                 // Allocation: Create a packet container
                 // An AVPacket holds the compressed data (e.g., one H.264 chunk)
@@ -154,6 +154,7 @@ int VideoIngestion::startIngestion() {
     avformat_network_deinit();
 
     Log::info(camName + " Thread Exited.");
+    Log::send("{\"status\":\"stopped\", \"cam\":" + std::to_string(camID) + "}");
 
     return 0;
 }

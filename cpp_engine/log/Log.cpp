@@ -7,6 +7,17 @@
 // Initialize the mutex
 std::mutex Log::s_Mutex;
 
+// Send data to parent Go program.
+void Log::send(const std::string& msg) {
+
+    // Acquire the lock
+    // Only one thread can pass this line at a time. 
+    // Others will wait here until the lock is released.
+    std::lock_guard<std::mutex> lock(s_Mutex);
+
+    std::cout << msg << std::endl;
+}
+
 void Log::info(const std::string& msg) {
 
     // Acquire the lock

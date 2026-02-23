@@ -56,8 +56,5 @@ func (m *Manager) AssignCamera(camID int, url string) error {
 
 	log.Printf("[Process Manager] Routing Cam %d -> Worker %d\n", camID, workerIndex)
 
-	// Format the protocol string expected by C++
-	command := fmt.Sprintf("START %d %s", camID, url)
-	
-	return targetWorker.SendCommand(command)
+	return targetWorker.AssignCam(Camera{ camID, url })
 }

@@ -1,12 +1,27 @@
 package process
 
 import (
-    "fmt"
-    "io"
-    "os"
-    "os/exec"
-    "sync"
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"time"
+	"os/exec"
+	"sync"
 )
+
+const LOGSEP = "==============================================\n"
+
+// Matches the JSON sent from C++
+type WorkerResponse struct {
+    Status string `json:"status"`
+    CamID  int    `json:"cam"`
+}
+
+type Camera struct {
+    ID   int
+    url  string
+}
 
 // Worker represents a single C++ subprocess
 type Worker struct {
@@ -14,6 +29,7 @@ type Worker struct {
     BinaryPath string
     Cmd        *exec.Cmd
     Stdin      io.WriteCloser
+    cameras    map[int]Camera
     mu         sync.Mutex // Protects concurrent writes to Stdin
 }
 
@@ -22,6 +38,18 @@ func NewWorker(id int, binaryPath string) *Worker {
     return &Worker{
         ID:         id,
         BinaryPath: binaryPath,
+        cameras: make(map[int]Camera),
+    }
+}
+
+func handleStoppedStream(w *Worker, resp WorkerResponse) {
+    if(resp.Status == "stopped") {
+
+        time.Sleep(8 * time.Second)
+
+        fmt.Println(LOGSEP + "[Go][Worker] restarting cam:", resp.CamID)
+        w.RestartCam(resp.CamID)
+
     }
 }
 
@@ -37,12 +65,43 @@ func (w *Worker) Start() error {
     w.Stdin = stdin
 
     // Redirect Stdout/Stderr to parent for now (Logs)
-    w.Cmd.Stdout = os.Stdout
-    w.Cmd.Stderr = os.Stderr
+    // w.Cmd.Stdout = os.Stdout
+    // w.Cmd.Stderr = os.Stderr
+
+    stdoutp, _ := w.Cmd.StdoutPipe()
+    stderrp, _ := w.Cmd.StderrPipe()
 
     if err := w.Cmd.Start(); err != nil {
         return fmt.Errorf("worker %d start failed: %v", w.ID, err)
     }
+
+    fmt.Printf("[Go][Worker] start stdin/err scanner, %v %v\n", stdoutp, stderrp)
+
+    // Listen for STDOUT (JSON Responses)
+    go func() {
+        scanner := bufio.NewScanner(stdoutp)
+        for scanner.Scan() {
+            text := scanner.Text()
+            var resp WorkerResponse
+            // If it's valid JSON, print prettily
+            if err := json.Unmarshal([]byte(text), &resp); err == nil {
+                fmt.Printf("[Go][Worker] Received Update -> Cam %d Status: %s\n", resp.CamID, resp.Status)
+                handleStoppedStream(w, resp);
+            } else {
+                fmt.Println("[Go][Worker] Raw:", text)
+            }
+        }
+    }()
+
+    // Listen for STDERR (Logs)
+    go func() {
+        scanner := bufio.NewScanner(stderrp)
+        for scanner.Scan() {
+            // Print C++ logs in Red color
+            fmt.Printf("\033[31m%s\033[0m\n", scanner.Text())
+        }
+    }()
+
 
     return nil
 }
@@ -60,6 +119,28 @@ func (w *Worker) SendCommand(cmd string) error {
     _, err := io.WriteString(w.Stdin, cmd+"\n")
     return err
 }
+
+func (w *Worker) AssignCam(cam Camera) error {
+
+    w.cameras[cam.ID] = cam;
+    return w.StartCam(cam)
+
+}
+
+func (w *Worker) StartCam(cam Camera) error {
+
+    command := fmt.Sprintf("START %d %s", cam.ID, cam.url)
+    return w.SendCommand(command)
+
+}
+
+func (w *Worker) RestartCam(camID int) error {
+
+    cam := w.cameras[camID]
+    return w.StartCam(cam)
+
+}
+
 
 // Stop cleanly closes the pipe and waits
 func (w *Worker) Stop() {
