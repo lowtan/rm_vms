@@ -5,9 +5,8 @@
 #include <chrono>
 
 #include "Log.h"
-#include "SharedMemory.h"
-
-const std::unique_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
+// #include "SharedMemory.h"
+// const std::unique_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
 
 /**
  * Checks for any options that FFmpeg did NOT consume.
@@ -26,8 +25,8 @@ void logUnusedOptions(AVDictionary* dict, const std::string& tag = "Stream") {
 }
 
 // --- Constructor ---
-VideoIngestion::VideoIngestion(int id, const std::string u)
-    : camID(id), url(u), stopSignal(false), fmtCtx(nullptr), options(nullptr)
+VideoIngestion::VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u)
+    : shm(mm), camID(id), url(u), stopSignal(false), fmtCtx(nullptr), options(nullptr)
 {
     camName = "[Cam" + std::to_string(camID) + "]";
     workerThread = std::thread(&VideoIngestion::startIngestion, this);
@@ -85,7 +84,7 @@ int VideoIngestion::startIngestion() {
                 // An AVPacket holds the compressed data (e.g., one H.264 chunk)
                 AVPacket* packet = av_packet_alloc();
 
-                Log::info("stopSignal" + std::to_string(stopSignal));
+                // Log::info("check stopSignal" + std::to_string(stopSignal));
                 // --- THE CRITICAL LOOP ---
                 while (!stopSignal) {
 
@@ -112,7 +111,7 @@ int VideoIngestion::startIngestion() {
 
                         // Push to Ring Buffer
                         // PushToSharedMemory(packet->data, packet->size, packet->pts);
-                        if(SHM->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
+                        if(shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
 
                             Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
 
@@ -170,10 +169,10 @@ int VideoIngestion::openInput() {
 
     int ret = avformat_open_input(&fmtCtx, url.c_str(), nullptr, &options);
     if (ret != 0) {
-        // 1. Create a buffer for the error message
+        // Create a buffer for the error message
         char errbuf[256];
         
-        // 2. Ask FFmpeg to translate the error code
+        // Ask FFmpeg to translate the error code
         av_strerror(ret, errbuf, sizeof(errbuf));
 
         // 3. Print it

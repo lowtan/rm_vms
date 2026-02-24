@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "AVDictionary.h"
+#include "SharedMemory.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -14,6 +15,8 @@ extern "C" {
 class VideoIngestion
 {
 private:
+    std::shared_ptr<ISharedMemory> shm;
+
     int camID;
     std::string camName;
     std::string url;
@@ -30,6 +33,6 @@ private:
     int openInput();
 
 public:
-    VideoIngestion(int id, const std::string u);
+    VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u);
     ~VideoIngestion();
 };

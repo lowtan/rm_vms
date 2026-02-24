@@ -54,6 +54,8 @@ func handleStoppedStream(w *Worker, resp WorkerResponse) {
 }
 
 // Start launches the C++ binary and sets up pipes
+// This code will setup pipes and send WorkerID to
+// cpp program, and should not be called twice.
 func (w *Worker) Start() error {
     w.Cmd = exec.Command(w.BinaryPath)
 
@@ -75,7 +77,7 @@ func (w *Worker) Start() error {
         return fmt.Errorf("worker %d start failed: %v", w.ID, err)
     }
 
-    fmt.Printf("[Go][Worker] start stdin/err scanner, %v %v\n", stdoutp, stderrp)
+    // fmt.Printf("[Go][Worker] start stdin/err scanner, %v %v\n", stdoutp, stderrp)
 
     // Listen for STDOUT (JSON Responses)
     go func() {
@@ -88,7 +90,7 @@ func (w *Worker) Start() error {
                 fmt.Printf("[Go][Worker] Received Update -> Cam %d Status: %s\n", resp.CamID, resp.Status)
                 handleStoppedStream(w, resp);
             } else {
-                fmt.Println("[Go][Worker] Raw:", text)
+                fmt.Printf("\033[38;2;0;200;0m%s\033[0m\n", text)
             }
         }
     }()
@@ -102,6 +104,7 @@ func (w *Worker) Start() error {
         }
     }()
 
+    w.SendWorkerID()
 
     return nil
 }
@@ -119,6 +122,14 @@ func (w *Worker) SendCommand(cmd string) error {
     _, err := io.WriteString(w.Stdin, cmd+"\n")
     return err
 }
+
+func (w *Worker) SendWorkerID() error {
+
+    command := fmt.Sprintf("WORKER %d", w.ID)
+    return w.SendCommand(command)
+
+}
+
 
 func (w *Worker) AssignCam(cam Camera) error {
 

@@ -6,7 +6,7 @@
 
 
 const std::vector<std::string> ValidCommands = {
-    "START", "STOP"
+    "EXIT", "START", "STOP", "WORKER"
 };
 
 std::queue<std::string> strsplit(const std::string& str, char delimiter) {

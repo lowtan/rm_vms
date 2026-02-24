@@ -1,11 +1,16 @@
 #include <iostream>
 #include <string>
+#include <vector>
 #include <map>
 
 #include "Log.h"
 #include "VideoIngestion.h"
 
 #include "Command.h"
+#include "SharedMemory.h"
+
+const std::shared_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
+
 
 int main() {
     // Optimize I/O
@@ -23,11 +28,22 @@ int main() {
 
         if(cmd.Name != "") {
 
-            Log::info("proper command:" + cmd.Name);
-            Log::info("proper command args:" + std::to_string(cmd.Args.size()));
+            if(cmd.Name == "WORKER") {
+                // Initialize SharedMemory
+                try {
+                    std::string worker = cmd.Args.front();
+                    std::string name = ringBufferNameFor(worker);
+                    // Initial with some basic 
+                    if(SHM->Create(name, 10, 1024000000000)==false){
+                        Log::error("Failed to create RingBuffer for:" + name);
+                        Log::send("{\"status\":\"shmerr\", \"worker\":" + name + "}");
+                    }
+                } catch (...) {
+                    Log::error("Error initializing SharedMemory.");
+                }
+            }
 
-            // Basic parsing: "START <ID> <URL>"
-            if (cmd.Name == "START") {
+            if(cmd.Name == "START") {
                 try {
 
                     std::string idStr = cmd.Args.front();
@@ -42,10 +58,10 @@ int main() {
 
                     // Run logic
                     int camID = std::stoi(idStr);
-                    activeCameras[camID] = std::make_unique<VideoIngestion>(camID, url);
+                    activeCameras[camID] = std::make_unique<VideoIngestion>(SHM, camID, url);
 
                 } catch (...) {
-                    Log::error("Error parsing command");
+                    Log::error("Error starting video ingestion.");
                 }
             }
 

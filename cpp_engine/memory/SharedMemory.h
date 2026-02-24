@@ -25,6 +25,7 @@ struct RingBufferHeader {
 // Calculation:
 // Buffer Base Address + sizeof(RingBufferHeader) = Start of Data
 
+std::string ringBufferNameFor(std::string worker);
 
 // ISharedMemory Interface
 class ISharedMemory {
@@ -44,5 +45,5 @@ public:
     virtual void Close() = 0;
 
     // Static Factory Method: Returns the correct OS version
-    static std::unique_ptr<ISharedMemory> CreateInstance();
+    static std::shared_ptr<ISharedMemory> CreateInstance();
 };

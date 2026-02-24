@@ -12,6 +12,10 @@
 
 #include "Log.h"
 
+std::string ringBufferNameFor(std::string worker) {
+    return "shm"+worker;
+}
+
 class LinuxSharedMemory : public ISharedMemory {
 private:
     std::string _name;
@@ -65,6 +69,9 @@ public:
         // We pre-calculate pointers so WriteFrame is fast
         uint8_t* cursor = _basePtr;
         _channels.reserve(numChannels);
+
+        Log::info("[SHM]Created " + _name + "->" + std::to_string(numChannels) + " size:" + std::to_string(sizePerChannel));
+        // Log::info("[SHM] total size: " + std::to_string(_totalSize));
 
         for(int i = 0; i < numChannels; ++i) {
             ChannelCtx ctx;
@@ -165,8 +172,12 @@ public:
 };
 
 // Factory
-std::unique_ptr<ISharedMemory> ISharedMemory::CreateInstance() {
-    return std::make_unique<LinuxSharedMemory>();
+// std::unique_ptr<ISharedMemory> ISharedMemory::CreateInstance() {
+//     return std::make_unique<LinuxSharedMemory>();
+// }
+
+std::shared_ptr<ISharedMemory> ISharedMemory::CreateInstance() {
+    return std::make_shared<LinuxSharedMemory>();
 }
 
 #endif
