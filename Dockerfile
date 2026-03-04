@@ -8,6 +8,10 @@
 # This prevents QEMU crashes during 'go mod tidy'.
 FROM --platform=$BUILDPLATFORM golang:1.24 AS go-builder
 
+# Pull in the target architecture from Docker buildx (e.g., linux and amd64)
+ARG TARGETOS
+ARG TARGETARCH
+
 WORKDIR /app
 COPY nvr_core/ nvr_core/
 COPY Makefile .
@@ -16,7 +20,8 @@ COPY Makefile .
 RUN [ -f go.mod ] || go mod init nvr-core
 RUN go mod tidy
 
-RUN make build-go
+# Force cross-compilation to the target architecture, disable CGO, and build
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} make build-go
 
 
 # ----------------------------------------------------
