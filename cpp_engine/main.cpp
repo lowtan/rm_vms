@@ -33,8 +33,11 @@ int main() {
                 try {
                     std::string worker = cmd.Args.front();
                     std::string name = ringBufferNameFor(worker);
-                    // Initial with some basic 
-                    if(SHM->Create(name, 10, 1024000000000)==false){
+                    // Initial with some basic
+                    // 10 MB per channel (10 * 1024 * 1024)
+                    // size_t bufferSize = 10485760;
+                    size_t bufferSize = 3145728; // 3mb
+                    if(SHM->Create(name, 10, bufferSize)==false){
                         Log::error("Failed to create RingBuffer for:" + name);
                         Log::send("{\"status\":\"shmerr\", \"worker\":" + name + "}");
                     }

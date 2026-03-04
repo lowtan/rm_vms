@@ -138,6 +138,7 @@ public:
 
         // Write Metadata
         FrameMetadata meta;
+        meta.magic = 0xFFAABBCC;
         meta.frameSize = static_cast<uint32_t>(size);
         meta.timestamp = timestamp;
         meta.isKeyFrame = isKey ? 1 : 0;
@@ -170,11 +171,6 @@ public:
         }
     }
 };
-
-// Factory
-// std::unique_ptr<ISharedMemory> ISharedMemory::CreateInstance() {
-//     return std::make_unique<LinuxSharedMemory>();
-// }
 
 std::shared_ptr<ISharedMemory> ISharedMemory::CreateInstance() {
     return std::make_shared<LinuxSharedMemory>();

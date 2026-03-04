@@ -5,8 +5,6 @@
 #include <chrono>
 
 #include "Log.h"
-// #include "SharedMemory.h"
-// const std::unique_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
 
 /**
  * Checks for any options that FFmpeg did NOT consume.
@@ -109,13 +107,17 @@ int VideoIngestion::startIngestion() {
                             isKey = true;
                         }
 
-                        // Push to Ring Buffer
-                        // PushToSharedMemory(packet->data, packet->size, packet->pts);
-                        if(shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
+try {
+    // Push to Ring Buffer
+    // PushToSharedMemory(packet->data, packet->size, packet->pts);
+    if(shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
 
-                            Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
+        Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
 
-                        }
+    }
+} catch(...) {
+    Log::error(camName + "[SHM] Catched, Failed to write frame data for cam:" + std::to_string(camID));
+}
 
                         // Write to Disk (Muxing)
                         // WriteToFile(packet);
