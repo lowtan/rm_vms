@@ -45,6 +45,8 @@ VideoIngestion::~VideoIngestion() {
 }
 
 
+
+
 // --- Private Method: startIngestion ---
 int VideoIngestion::startIngestion() {
 
@@ -78,6 +80,32 @@ int VideoIngestion::startIngestion() {
                 Log::info(camName + "Connected! Starting Ingestion Loop...");
                 Log::send("{CamID: " + std::to_string(camID) + ", Status: 1}");
 
+                // --- INITIALIZE BITSTREAM FILTER ---
+                const AVBitStreamFilter *bsf = av_bsf_get_by_name("dump_extra");
+                AVBSFContext *bsfCtx = nullptr;
+
+                if (av_bsf_alloc(bsf, &bsfCtx) < 0) {
+                    Log::error(camName + " Failed to allocate dump_extra BSF.");
+                    return -1;
+                }
+
+                // Copy the camera's codec parameters (containing the SPS/PPS) into the filter
+                if (avcodec_parameters_copy(bsfCtx->par_in, fmtCtx->streams[videoStreamIndex]->codecpar) < 0) {
+                    Log::error(camName + " Failed to copy parameters to BSF.");
+                    av_bsf_free(&bsfCtx);
+                    return -1;
+                }
+
+                if (av_bsf_init(bsfCtx) < 0) {
+                    Log::error(camName + " Failed to initialize BSF.");
+                    av_bsf_free(&bsfCtx);
+                    return -1;
+                }
+                // -----------------------------------
+
+
+                bool waitForKeyFrame = true;
+
                 // Allocation: Create a packet container
                 // An AVPacket holds the compressed data (e.g., one H.264 chunk)
                 AVPacket* packet = av_packet_alloc();
@@ -97,36 +125,50 @@ int VideoIngestion::startIngestion() {
                     }
 
                     // == Filter: Only process packets belonging to the video stream
+                    // == Filter: Only process packets belonging to the video stream
                     if (packet->stream_index == videoStreamIndex) {
 
-                        bool isKey = false;
+                        // 1. Send raw packet to the filter 
+                        // (This consumes the original packet reference on success)
+                        if (av_bsf_send_packet(bsfCtx, packet) == 0) {
+                            
+                            // 2. Receive the modified packet(s) back
+                            while (av_bsf_receive_packet(bsfCtx, packet) == 0) {
+                                
+                                bool isKey = (packet->flags & AV_PKT_FLAG_KEY);
 
-                        // Check if it's a Keyframe (I-Frame)
-                        if (packet->flags & AV_PKT_FLAG_KEY) {
-                            // std::cout << "Found Keyframe! Size: " << packet->size << std::endl;
-                            isKey = true;
+                                if (waitForKeyFrame) {
+                                    if (isKey) {
+                                        Log::info(camName + "[SHM] First key frame found. " + std::to_string(camID));
+                                        waitForKeyFrame = false;
+                                    } else {
+                                        // MUST clean up the packet before skipping
+                                        av_packet_unref(packet); 
+                                        continue;
+                                    }
+                                }
+
+                                try {
+                                    // Push the newly filtered packet to Ring Buffer
+                                    if (shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey) < 0) {
+                                        Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
+                                    }
+                                } catch(...) {
+                                    Log::error(camName + "[SHM] Catched, Failed to write frame data for cam:" + std::to_string(camID));
+                                }
+
+                                // Clean up the filtered packet after writing
+                                av_packet_unref(packet);
+                            }
+                        } else {
+                            // If send fails, clean up the original packet
+                            av_packet_unref(packet);
                         }
-
-try {
-    // Push to Ring Buffer
-    // PushToSharedMemory(packet->data, packet->size, packet->pts);
-    if(shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey)<0) {
-
-        Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
-
-    }
-} catch(...) {
-    Log::error(camName + "[SHM] Catched, Failed to write frame data for cam:" + std::to_string(camID));
-}
-
-                        // Write to Disk (Muxing)
-                        // WriteToFile(packet);
+                    } else {
+                        // Not a video stream packet, discard it
+                        av_packet_unref(packet);
                     }
 
-                    // -- Essential per-frame cleanup --
-                    // Clean up: we MUST wipe the packet after using it,
-                    // otherwise memory will explode in seconds.
-                    av_packet_unref(packet);
 
                 }
                 // --- END: THE CRITICAL LOOP ---

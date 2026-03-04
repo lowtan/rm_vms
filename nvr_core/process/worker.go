@@ -58,6 +58,12 @@ func (w *Worker) handleStoppedStream(resp WorkerResponse) {
 
 func (w *Worker) startSHMReader(resp WorkerResponse) {
 
+    // Create a hub
+    // shub := stream.NewHub()
+
+    // Attach the WebSocket route
+    // mux.HandleFunc("GET /ws/stream/1", stream.StreamHandler(shub))
+
     // Launch the reader in the background so it doesn't block the command loop
     go StartStreamReader(strconv.Itoa(w.ID), 10, 3145728)
 

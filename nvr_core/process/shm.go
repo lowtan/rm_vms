@@ -51,7 +51,7 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 	// Mmap
 	stat, _ := f.Stat()
 	size := stat.Size()
-    
+
 	mmap, err := syscall.Mmap(int(f.Fd()), 0, int(size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return nil, err
@@ -62,12 +62,13 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 		data: mmap,
 	}
 
-	// 3. Parse Offsets
+	// Parse Offsets
 	offset := 0
 	for i := 0; i < numChannels; i++ {
+
 		// Calculate pointer to header
 		headerPtr := (*RingBufferHeader)(unsafe.Pointer(&w.data[offset]))
-		
+
 		// data starts after header
 		dataStartOffset := offset + HeaderSize
 		dataEndOffset := dataStartOffset + sizePerChannel
@@ -93,17 +94,17 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 		return nil, 0, false // Buffer is empty
 	}
 
-	// 1. Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
+	// Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
 	// C++ definitely wrapped here.
 	if tail+MetadataSize > rb.Capacity {
 		tail = 0 
 	}
 
-	// 2. Read Metadata
+	// Read Metadata
 	metaBytes := rb.DataStart[tail : tail+MetadataSize]
 	magic := binary.LittleEndian.Uint32(metaBytes[0:4])
 
-	// 3. Wrap-Around Detection
+	// Wrap-Around Detection
 	if magic != MagicNumber {
 		// C++ skipped this section because the frame didn't fit. 
 		// Wrap the reader to 0.
@@ -122,7 +123,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 		}
 	}
 
-	// 4. Extract Metadata
+	// Extract Metadata
 	// Note: frameSize is now at offset 4:8 because magic takes 0:4
 	frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
 	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
@@ -131,22 +132,23 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 	start := tail + MetadataSize
 	end := start + frameSize
 
-	// 5. Ultimate Panic Fail-Safe
+	// Ultimate Panic Fail-Safe
 	// Even with the magic number, if memory corruption occurs, prevent a crash.
 	if end > rb.Capacity {
 		atomic.StoreUint32(&rb.Header.ReadTail, head) // Drop and recover
 		return nil, 0, false
 	}
 
-	// 6. Copy Data safely
+	// Copy Data safely
 	frameData := make([]byte, frameSize)
 	copy(frameData, rb.DataStart[start:end])
 
-	// 7. Commit Read
+	// Commit Read
 	atomic.StoreUint32(&rb.Header.ReadTail, end)
 
 	return frameData, timestamp, true
 }
+
 
 func (w *WorkerSHM) Close() {
 	syscall.Munmap(w.data)

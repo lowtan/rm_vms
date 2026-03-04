@@ -14,7 +14,7 @@ struct FrameMetadata {
     uint32_t frameSize;    // Size of the actual video data
     uint64_t timestamp;    // Unix timestamp or PTS
     uint8_t  isKeyFrame;   // 1 = I-Frame, 0 = P/B-Frame
-    uint8_t  _padding[51]; // Pad to 64 bytes for alignment
+    uint8_t  _padding[47]; // Pad to 64 bytes for alignment
 };
 
 struct RingBufferHeader {

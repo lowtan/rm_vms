@@ -4,6 +4,7 @@ import (
 	// "context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func StartStreamReader(workerName string, numChannels int, bufferSize int) {
 	
 	log.Printf("[Go Manager] Successfully connected to %s. Spawning readers...\n", shmName)
 
-	// 2. Spawn a Goroutine for each camera channel
+	// Spawn a Goroutine for each camera channel
 	for i := 0; i < numChannels; i++ {
 		go readChannelLoop(shmName, i, shm.Channels[i])
 	}
@@ -50,7 +51,8 @@ func readChannelLoop(workerName string, channelID int, rb *RingBuffer) {
 
 	for {
 		// Attempt to read a frame
-		frameData, timestamp, ok := rb.ReadFrame()
+		// frameData, timestamp, ok := rb.ReadFrame()
+		frameData, _, ok := rb.ReadFrame()
 
 		if !ok {
 			// Buffer is empty.
@@ -64,10 +66,26 @@ func readChannelLoop(workerName string, channelID int, rb *RingBuffer) {
 		// frameData now holds the raw video bytes (e.g., H.264 NAL units).
 		// You can route this data to disk, a WebSocket, or a WebRTC pipeline.
 
+		fileDumpTest(frameData, workerName, channelID)
+
 		// For debugging, print occasionally (e.g., every 100th frame)
-		if timestamp%1000 == 0 {
-			fmt.Printf("[%s-Ch%d] Received Frame: %d bytes, TS: %d\n", 
-				workerName, channelID, len(frameData), timestamp)
-		}
+		// if timestamp%1000 == 0 {
+		// 	fmt.Printf("[%s-Ch%d] Received Frame: %d bytes, TS: %d\n", 
+		// 		workerName, channelID, len(frameData), timestamp)
+		// }
 	}
+}
+
+func fileDumpTest(frame []byte, worker string, channel int) {
+
+	f, err := os.OpenFile(fmt.Sprintf("/app/recordings/debug_worker%v_cam_%d.264", worker, channel), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(frame); err != nil {
+		log.Println("Write error:", err)
+	}
+
 }
