@@ -1,25 +1,17 @@
 package utils
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-// WaitForExitSignal blocks execution until the OS sends a termination signal
-// (Ctrl+C, Docker Stop, Kubernetes Terminate, etc.)
-func WaitForExitSignal() {
-
-	c := make(chan os.Signal, 1)
-
-	// Subscribe to signals
-	// SIGINT  = Ctrl+C
-	// SIGTERM = Standard "Kill" command (Docker stop)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
-	// Block here until a message arrives
-	<-c
-
-	fmt.Println("\n[Signal] Shutdown signal received. Cleaning up...")
+// SetupSignalContext returns a context that automatically cancels 
+// when the application receives an interrupt or termination signal.
+func SetupSignalContext() (context.Context, context.CancelFunc) {
+	// context.Background() is the empty root context.
+	// NotifyContext wraps it, listening for SIGINT and SIGTERM.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	return ctx, cancel
 }

@@ -1,19 +1,25 @@
 package process
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"nvr_core/utils"
 )
 
 // Manager handles the pool of workers
 type Manager struct {
+	cfg        *utils.Config
+	ctx        context.Context
 	workers    []*Worker
 	binaryPath string
 }
 
 // NewManager initializes the pool (e.g., count=4)
-func NewManager(count int, binaryPath string) *Manager {
+func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath string) *Manager {
 	mgr := &Manager{
+		ctx: ctx,
+		cfg: cfg,
 		workers:    make([]*Worker, count),
 		binaryPath: binaryPath,
 	}
@@ -30,7 +36,7 @@ func NewManager(count int, binaryPath string) *Manager {
 func (m *Manager) StartAll() error {
 	for _, w := range m.workers {
 		fmt.Printf("[Process Manager] Starting Worker %d...\n", w.ID)
-		if err := w.Start(); err != nil {
+		if err := w.Start(m.ctx); err != nil {
 			return err
 		}
 	}

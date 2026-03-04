@@ -14,6 +14,7 @@ import (
 const (
 	MetadataSize = 64
 	HeaderSize   = 64 // RingBufferHeader size
+	MagicNumber  uint32 = 0xFFAABBCC
 )
 
 // WorkerSHM manages the shared memory connection for one Worker process
@@ -84,50 +85,65 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 	return w, nil
 }
 
-// ReadFrame checks if new data is available. 
-// This should be called in a loop (goroutine) for each channel.
 func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
-	// Atomic Load
 	head := atomic.LoadUint32(&rb.Header.WriteHead)
 	tail := atomic.LoadUint32(&rb.Header.ReadTail)
 
 	if tail == head {
-		return nil, 0, false // Empty
+		return nil, 0, false // Buffer is empty
 	}
 
-    // Logic to handle Wrap-around detection would go here.
-    // In our simplified C++ logic, if Head < Tail, it means Head wrapped.
-    // If we are at Tail, check if there is valid data.
-    
-    // Read Metadata
-    // We need to handle the case where Tail wraps to 0 automatically 
-    // if C++ wrapped it.
-    // Simplification: Assume Tail jumps to 0 if Tail + MetaSize > Capacity
-    // (This requires identical logic to C++ writer)
+	// 1. Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
+	// C++ definitely wrapped here.
+	if tail+MetadataSize > rb.Capacity {
+		tail = 0 
+	}
 
+	// 2. Read Metadata
 	metaBytes := rb.DataStart[tail : tail+MetadataSize]
-	frameSize := binary.LittleEndian.Uint32(metaBytes[0:4])
-	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
+	magic := binary.LittleEndian.Uint32(metaBytes[0:4])
 
-	// Calculate data location
+	// 3. Wrap-Around Detection
+	if magic != MagicNumber {
+		// C++ skipped this section because the frame didn't fit. 
+		// Wrap the reader to 0.
+		tail = 0 
+		
+		// Re-read metadata at index 0
+		metaBytes = rb.DataStart[tail : tail+MetadataSize]
+		magic = binary.LittleEndian.Uint32(metaBytes[0:4])
+		
+		// If it's STILL wrong, the reader has fallen completely out of sync 
+		// (e.g., C++ overwrote the data before Go could read it).
+		if magic != MagicNumber {
+			// Emergency Recovery: Catch up to the writer's head to drop corrupted state
+			atomic.StoreUint32(&rb.Header.ReadTail, head)
+			return nil, 0, false
+		}
+	}
+
+	// 4. Extract Metadata
+	// Note: frameSize is now at offset 4:8 because magic takes 0:4
+	frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
+	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
+	// isKeyFrame := metaBytes[16] // Available if you need it later
+
 	start := tail + MetadataSize
 	end := start + frameSize
 
-	// Copy data out to Go memory (Safe)
-    // For true zero-copy, you'd pass the slice slice := rb.DataStart[start:end]
-    // BUT you must process it before updating ReadTail.
+	// 5. Ultimate Panic Fail-Safe
+	// Even with the magic number, if memory corruption occurs, prevent a crash.
+	if end > rb.Capacity {
+		atomic.StoreUint32(&rb.Header.ReadTail, head) // Drop and recover
+		return nil, 0, false
+	}
+
+	// 6. Copy Data safely
 	frameData := make([]byte, frameSize)
 	copy(frameData, rb.DataStart[start:end])
 
-	// Update Tail (Commit Read)
-	newTail := end
-    
-    // Handle the C++ wrap logic:
-    // If the Writer wrapped, we must also wrap if we hit the end constraint.
-    // In production, you usually use a 'magic byte' or specific flag 
-    // in the header to indicate "End of Buffer, go to 0".
-    
-	atomic.StoreUint32(&rb.Header.ReadTail, newTail)
+	// 7. Commit Read
+	atomic.StoreUint32(&rb.Header.ReadTail, end)
 
 	return frameData, timestamp, true
 }

@@ -3,27 +3,25 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	// Internal Packages
+	"nvr_core/apiserver"
 	"nvr_core/process"
 	"nvr_core/utils"
 )
 
-const CPP_WORKER_BIN = "./nvr_worker"
-
-// Matches the JSON sent from C++
-type WorkerResponse struct {
-	Status string `json:"status"`
-	CamID  int    `json:"cam"`
-}
-
 func main() {
+
+	// application-wide context
+	ctx, cancel := utils.SetupSignalContext()
+	defer cancel() // Ensures resources are freed when main exits
 
 	// Load Configuration
 	fmt.Println("[Go Manager] v.0.0.1")
 	fmt.Println("[Go Manager] Loading config...")
 
-	cfg, err := LoadConfig("config.json")
+	cfg, err := utils.LoadConfig("config.json")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
@@ -31,23 +29,21 @@ func main() {
 	fmt.Printf("[Go Manager] Config Loaded. Storage: %s, Cameras: %d\n", 
 			cfg.Server.StoragePath, len(cfg.Cameras))
 
-	pm := process.NewManager(4, CPP_WORKER_BIN)
+	process.Startup(ctx, cfg)
 
-	if err := pm.StartAll(); err != nil {
-		log.Fatalf("Failed to start workers: %v", err)
-	}
-	defer pm.StopAll() // Cleanup on exit
+	go apiserver.Initiate(ctx, cfg)
 
-	// Distribute Cameras
-	for _, cam := range cfg.Cameras {
-		if cam.Enabled {
-			if err := pm.AssignCamera(cam.ID, cam.URL); err != nil {
-				log.Printf("Failed to assign cam %d: %v", cam.ID, err)
-			}
-		}
-	}
+	// Block until the context is canceled (SIGINT/SIGTERM received)
+	<-ctx.Done()
 
-	// Block until Ctrl+C (Graceful Shutdown)
-	utils.WaitForExitSignal()
+	fmt.Println("\n[Signal] Shutdown signal received. Gracefully terminating subsystems...")
+
+	// TODO:
+	// At this point, the context is canceled. 
+	// The C++ workers are automatically receiving kill signals.
+	// We can add a brief time.Sleep() here or use a sync.WaitGroup 
+	// to give everything a second to flush buffers before main() finally exits.
+
+	time.Sleep(5*time.Second)
 
 }
