@@ -10,29 +10,45 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-// int startIngestion(int camID, const std::string& url);
 
 class VideoIngestion
 {
+public:
+    VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u);
+    ~VideoIngestion();
+
 private:
+
     std::shared_ptr<ISharedMemory> shm;
 
     int camID;
     std::string camName;
     std::string url;
 
-    // These vars should be initialized at startIngestion()
-    AVDictionary* options;
+    // --- FFmpeg Contexts & Options ---
     AVFormatContext* fmtCtx;
+    AVDictionary* options;
+    AVBSFContext* bsfCtx;       // Bitstream filter context for SPS/PPS injection
 
     // Threading controls
     std::atomic<bool> stopSignal; // Each camera has its own stop flag
     std::thread workerThread;            // The thread handling the loop
 
-    int startIngestion();
-    int openInput();
+    // --- Stream Tracking ---
+    int videoStreamIndex;
+    int audioStreamIndex;
+    bool waitForKeyFrame;       // Ensures we drop P-frames until our first IDR
 
-public:
-    VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u);
-    ~VideoIngestion();
+    int startIngestion();       // The main worker thread loop
+    int openInput();            // Connects to the RTSP source
+    int cleanup();              // Safely frees all FFmpeg resources
+
+    // --- Setup Helpers ---
+    void findStreamIndices();
+    int initVideoFilter();
+
+    // --- Packet Routing & Processing ---
+    void routePacket(AVPacket* packet);
+    void ingestVideo(AVPacket* packet);
+    void ingestAudio(AVPacket* packet);
 };

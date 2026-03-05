@@ -18,6 +18,7 @@ func main() {
 	defer cancel() // Ensures resources are freed when main exits
 
 	// Load Configuration
+	fmt.Println("================================================")
 	fmt.Println("[Go Manager] v.0.0.1")
 	fmt.Println("[Go Manager] Loading config...")
 

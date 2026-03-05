@@ -109,11 +109,11 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 		// C++ skipped this section because the frame didn't fit. 
 		// Wrap the reader to 0.
 		tail = 0 
-		
+
 		// Re-read metadata at index 0
 		metaBytes = rb.DataStart[tail : tail+MetadataSize]
 		magic = binary.LittleEndian.Uint32(metaBytes[0:4])
-		
+
 		// If it's STILL wrong, the reader has fallen completely out of sync 
 		// (e.g., C++ overwrote the data before Go could read it).
 		if magic != MagicNumber {
