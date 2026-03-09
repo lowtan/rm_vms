@@ -22,6 +22,8 @@ private:
     int _shm_fd = -1;
     uint8_t* _basePtr = nullptr;
     size_t _totalSize = 0;
+    int _maxChannel = 0;
+    int _lastChannelId = 0;
 
     // Helper struct to cache pointers for each channel
     // This prevents recalculating offsets on every single frame write
@@ -31,11 +33,14 @@ private:
         uint32_t capacity;
     };
     std::vector<ChannelCtx> _channels;
+    std::unordered_map<int, int> _channelForCam;
 
 public:
     bool Create(const std::string& name, int numChannels, size_t sizePerChannel) override {
         // Setup Name (POSIX requires leading slash)
         _name = (name[0] == '/') ? name : "/" + name;
+
+        _maxChannel = numChannels;
 
         // Calculate Total Size
         // Layout: [Header 0][Data 0] ... [Header N][Data N]
@@ -70,7 +75,10 @@ public:
         uint8_t* cursor = _basePtr;
         _channels.reserve(numChannels);
 
-        Log::info("[SHM]Created " + _name + "->" + std::to_string(numChannels) + " size:" + std::to_string(sizePerChannel));
+        std::string strChanNum = std::to_string(numChannels);
+        std::string strPerSize = std::to_string(sizePerChannel);
+
+        // Log::info("[SHM]Created " + _name + "->" + " size:" + strPerSize);
         // Log::info("[SHM] total size: " + std::to_string(_totalSize));
 
         for(int i = 0; i < numChannels; ++i) {
@@ -95,6 +103,29 @@ public:
         }
 
         return true;
+    }
+
+    int ChannelForCamID(int camID) {
+
+        if (_channelForCam.find(camID) == _channelForCam.end()) {
+
+            if(_lastChannelId < _maxChannel) {
+
+                // Key does not exist, assign last one
+                _channelForCam[camID] = _lastChannelId;
+                _lastChannelId++;
+
+            } else {
+
+                // Reached max channel number
+                return -1;
+
+            }
+
+        }
+
+        return _channelForCam[camID];
+
     }
 
     // Returns false if buffer is full

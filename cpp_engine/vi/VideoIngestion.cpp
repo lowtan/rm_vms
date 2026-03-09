@@ -27,7 +27,18 @@ VideoIngestion::VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const 
     : shm(mm), camID(id), url(u), stopSignal(false), fmtCtx(nullptr), options(nullptr)
 {
     camName = "[Cam" + std::to_string(camID) + "]";
-    workerThread = std::thread(&VideoIngestion::startIngestion, this);
+    shmChannelID = shm->ChannelForCamID(camID);
+
+    if(shmChannelID < 0) {
+
+        Log::error(camName + "SHM reached max channel!");
+
+    } else {
+
+        workerThread = std::thread(&VideoIngestion::startIngestion, this);
+
+    }
+
 }
 
 // --- Destructor ---
@@ -69,7 +80,7 @@ int VideoIngestion::startIngestion() {
     if (initVideoFilter() < 0) return cleanup();
 
     Log::info(camName + " Connected! Starting Ingestion Loop...");
-    Log::send("{\"status\":\"starting\", \"cam\":" + std::to_string(camID) + "}");
+    Log::send("{\"status\":\"starting\", \"cam\":" + std::to_string(camID) + ", \"channel\":" + std::to_string(shmChannelID) + "}");
 
     // The Main Loop
     AVPacket* packet = av_packet_alloc();
@@ -159,7 +170,7 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
             }
 
             try {
-                if (shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey) < 0) {
+                if (shm->WriteFrame(shmChannelID, packet->data, packet->size, packet->pts, isKey) < 0) {
                     Log::error(camName + " [SHM] Failed to write frame data.");
                 }
             } catch(...) {
@@ -176,159 +187,6 @@ void VideoIngestion::ingestAudio(AVPacket* packet) {
     // TODO: Implement audio extraction and routing to Audio SHM Buffer
 }
 
-// int VideoIngestion::startIngestion() {
-
-//     // Initialize FFmpeg Network
-//     avformat_network_init();
-
-//     options = configureAVDictionary(nullptr);
-
-//     if(this->openInput()==0) {
-
-//         if (avformat_find_stream_info(fmtCtx, nullptr) < 0) {
-//             Log::error(camName + "Could not retrieve stream info.");
-//             // 
-//         } else {
-
-//             // Locate the Video Stream Index
-//             int videoStreamIndex = -1;
-//             for (unsigned int i = 0; i < fmtCtx->nb_streams; i++) {
-//                 if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-//                     videoStreamIndex = i;
-//                     break;
-//                 }
-//             }
-
-//             if (videoStreamIndex == -1) {
-
-//                 std::cerr << camName << "No video stream found." << std::endl;
-
-//             } else {
-
-//                 Log::info(camName + "Connected! Starting Ingestion Loop...");
-//                 Log::send("{CamID: " + std::to_string(camID) + ", Status: 1}");
-
-//                 // --- INITIALIZE BITSTREAM FILTER ---
-//                 const AVBitStreamFilter *bsf = av_bsf_get_by_name("dump_extra");
-//                 AVBSFContext *bsfCtx = nullptr;
-
-//                 if (av_bsf_alloc(bsf, &bsfCtx) < 0) {
-//                     Log::error(camName + " Failed to allocate dump_extra BSF.");
-//                     return -1;
-//                 }
-
-//                 // Copy the camera's codec parameters (containing the SPS/PPS) into the filter
-//                 if (avcodec_parameters_copy(bsfCtx->par_in, fmtCtx->streams[videoStreamIndex]->codecpar) < 0) {
-//                     Log::error(camName + " Failed to copy parameters to BSF.");
-//                     av_bsf_free(&bsfCtx);
-//                     return -1;
-//                 }
-
-//                 if (av_bsf_init(bsfCtx) < 0) {
-//                     Log::error(camName + " Failed to initialize BSF.");
-//                     av_bsf_free(&bsfCtx);
-//                     return -1;
-//                 }
-//                 // -----------------------------------
-
-
-//                 bool waitForKeyFrame = true;
-
-//                 // Allocation: Create a packet container
-//                 // An AVPacket holds the compressed data (e.g., one H.264 chunk)
-//                 AVPacket* packet = av_packet_alloc();
-
-//                 // Log::info("check stopSignal" + std::to_string(stopSignal));
-//                 // --- THE CRITICAL LOOP ---
-//                 while (!stopSignal) {
-
-//                     // == Read a frame from the network
-//                     // av_read_frame grabs the next RTP packet(s) and assembles them 
-//                     // into a single "Access Unit" (compressed frame)
-//                     int ret = av_read_frame(fmtCtx, packet);
-
-//                     if (ret < 0) {
-//                         std::cerr << camName << "Error or End of Stream." << std::endl;
-//                         break; // Reconnect logic would go here
-//                     }
-
-//                     // == Filter: Only process packets belonging to the video stream
-//                     // == Filter: Only process packets belonging to the video stream
-//                     if (packet->stream_index == videoStreamIndex) {
-
-//                         // Send raw packet to the filter 
-//                         // (This consumes the original packet reference on success)
-//                         if (av_bsf_send_packet(bsfCtx, packet) == 0) {
-                            
-//                             // Receive the modified packet(s) back
-//                             while (av_bsf_receive_packet(bsfCtx, packet) == 0) {
-                                
-//                                 bool isKey = (packet->flags & AV_PKT_FLAG_KEY);
-
-//                                 if (waitForKeyFrame) {
-//                                     if (isKey) {
-//                                         Log::info(camName + "[SHM] First key frame found. " + std::to_string(camID));
-//                                         waitForKeyFrame = false;
-//                                     } else {
-//                                         // MUST clean up the packet before skipping
-//                                         av_packet_unref(packet); 
-//                                         continue;
-//                                     }
-//                                 }
-
-//                                 try {
-//                                     // Push the newly filtered packet to Ring Buffer
-//                                     if (shm->WriteFrame(camID, packet->data, packet->size, packet->pts, isKey) < 0) {
-//                                         Log::error(camName + "[SHM] Failed to write frame data for cam:" + std::to_string(camID));
-//                                     }
-//                                 } catch(...) {
-//                                     Log::error(camName + "[SHM] Catched, Failed to write frame data for cam:" + std::to_string(camID));
-//                                 }
-
-//                                 // Clean up the filtered packet after writing
-//                                 av_packet_unref(packet);
-//                             }
-//                         } else {
-//                             // If send fails, clean up the original packet
-//                             av_packet_unref(packet);
-//                         }
-//                     } else {
-//                         // Not a video stream packet, discard it
-//                         av_packet_unref(packet);
-//                     }
-
-
-//                 }
-//                 // --- END: THE CRITICAL LOOP ---
-
-//                 av_packet_free(&packet);
-
-//             }
-
-//         }
-
-//     }
-
-//     // Close the input. This frees fmtCtx and closes the socket.
-//     if (fmtCtx) {
-//         avformat_close_input(&fmtCtx); 
-//         fmtCtx = nullptr;
-//     }
-
-//     // Free the dictionary options
-//     if (options) {
-//         av_dict_free(&options);
-//         options = nullptr;
-//     }
-
-//     // Deinit network
-//     avformat_network_deinit();
-
-//     Log::info(camName + " Thread Exited.");
-//     Log::send("{\"status\":\"stopped\", \"cam\":" + std::to_string(camID) + "}");
-
-//     return 0;
-// }
 
 // --- Private Method: openInput ---
 /**

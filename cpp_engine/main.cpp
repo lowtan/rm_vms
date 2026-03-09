@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 
 #include "Log.h"
 #include "VideoIngestion.h"
@@ -37,9 +38,12 @@ int main() {
                     // 10 MB per channel (10 * 1024 * 1024)
                     // size_t bufferSize = 10485760;
                     size_t bufferSize = 3145728; // 3mb
-                    if(SHM->Create(name, 10, bufferSize)==false){
+                    int chnNum = 10;
+                    if(SHM->Create(name, chnNum, bufferSize)==false){
                         Log::error("Failed to create RingBuffer for:" + name);
-                        Log::send("{\"status\":\"shmerr\", \"worker\":" + name + "}");
+                        Log::send("{\"status\":\"shmerr\", \"worker\":\"" + name + "}\"");
+                    } else {
+                        Log::send("{\"status\":\"shm\", \"channumber\":" + std::to_string(chnNum) + ", \"size\":" + std::to_string(bufferSize) + "}");
                     }
                 } catch (...) {
                     Log::error("Error initializing SharedMemory.");

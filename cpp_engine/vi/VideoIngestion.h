@@ -22,6 +22,7 @@ private:
     std::shared_ptr<ISharedMemory> shm;
 
     int camID;
+    int shmChannelID;
     std::string camName;
     std::string url;
 

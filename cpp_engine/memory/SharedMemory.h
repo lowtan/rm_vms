@@ -3,6 +3,7 @@
 #include <memory>
 #include <cstdint>
 #include <atomic>
+#include <unordered_map>
 
 // Align to 64 bytes to prevent "False Sharing" on CPU cache lines
 #define CACHE_LINE 64
@@ -32,12 +33,17 @@ std::string ringBufferNameFor(std::string worker);
 
 // ISharedMemory Interface
 class ISharedMemory {
+private:
+    std::unordered_map<int, int> _channelForCam;
+
 public:
     virtual ~ISharedMemory() = default;
 
     // Initialize Shared Memory for N channels
     // We replace the generic 'size' with specific channel config
     virtual bool Create(const std::string& name, int numChannels, size_t sizePerChannel) = 0;
+
+    virtual int ChannelForCamID(int camID) = 0;
 
     // Write a video frame to a specific channel (Thread-Safe via atomics)
     virtual bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey) = 0;
