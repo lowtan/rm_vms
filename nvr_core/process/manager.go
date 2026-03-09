@@ -13,6 +13,7 @@ type Manager struct {
 	ctx        context.Context
 	workers    []*Worker
 	binaryPath string
+	camWorker  map[int]int
 }
 
 // NewManager initializes the pool (e.g., count=4)
@@ -22,6 +23,7 @@ func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath st
 		cfg: cfg,
 		workers:    make([]*Worker, count),
 		binaryPath: binaryPath,
+		camWorker: make(map[int]int),
 	}
 
 	// Initialize workers
@@ -45,6 +47,7 @@ func (m *Manager) StartAll() error {
 
 // StopAll shuts them down
 func (m *Manager) StopAll() {
+	log.Printf("[Manager][StopAll]")
 	for _, w := range m.workers {
 		w.Stop()
 	}
@@ -60,7 +63,20 @@ func (m *Manager) AssignCamera(camID int, url string) error {
 	workerIndex := camID % len(m.workers)
 	targetWorker := m.workers[workerIndex]
 
-	log.Printf("[Process Manager] Routing Cam %d -> Worker %d\n", camID, workerIndex)
+	m.camWorker[camID] = workerIndex;
 
-	return targetWorker.AssignCam(Camera{ camID, url })
+	log.Printf("[Manager][AssignCamera] Routing Cam %d -> Worker %d\n", camID, workerIndex)
+
+	return targetWorker.AssignCam(&Camera{ camID, url, -1})
+}
+
+func (m *Manager) CameraWorker(camID int) *Worker {
+
+	log.Printf("[Manager][CameraWorker] Cam %d list(%d)\n", camID, len(m.camWorker))
+
+	index := m.camWorker[camID];
+
+	log.Printf("[Manager][CameraWorker] Cam %d -> Worker %d\n", camID, index)
+
+	return m.workers[index];
 }

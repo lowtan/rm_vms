@@ -11,19 +11,24 @@ import (
 	"sync"
 	"syscall"
 	"time"
+    "nvr_core/shm"
+    "nvr_core/stream"
 )
 
 const LOGSEP = "==============================================\n"
 
 // Matches the JSON sent from C++
 type WorkerResponse struct {
-    Status string `json:"status"`
-    CamID  int    `json:"cam"`
+    Status    string `json:"status"`
+    CamID     int    `json:"cam"`
+    ChannelID int    `json:"channel"`
+    Size      int    `json:"size"`
 }
 
 type Camera struct {
     ID   int
     url  string
+    ChannelID   int
 }
 
 // Worker represents a single C++ subprocess
@@ -32,9 +37,12 @@ type Worker struct {
     BinaryPath string
     Cmd        *exec.Cmd
     Stdin      io.WriteCloser
-    Stdout      io.ReadCloser
-    Stderr      io.ReadCloser
-    cameras    map[int]Camera
+    Stdout     io.ReadCloser
+    Stderr     io.ReadCloser
+    cameras    map[int]*Camera
+    // SHM reader and stream hub
+    shmReader  *shm.ReaderSHM
+    streamHubs map[int]*stream.Hub
     mu         sync.Mutex // Protects concurrent writes to Stdin
 }
 
@@ -43,7 +51,8 @@ func NewWorker(id int, binaryPath string) *Worker {
     return &Worker{
         ID:         id,
         BinaryPath: binaryPath,
-        cameras: make(map[int]Camera),
+        cameras: make(map[int]*Camera),
+        streamHubs: make(map[int]*stream.Hub),
     }
 }
 
@@ -56,16 +65,36 @@ func (w *Worker) handleStoppedStream(resp WorkerResponse) {
 
 }
 
+
+func (w *Worker) updateCameraSHMChannel(resp WorkerResponse) {
+
+    fmt.Println(LOGSEP + "[Go][Worker] update SHM Channel cam:", resp.CamID, resp.ChannelID)
+    cam := w.cameras[resp.CamID]
+    cam.ChannelID = resp.ChannelID
+
+    // Update SHM stream reader
+    if(w.shmReader == nil) {
+        fmt.Println("[Go][Worker] no shm reader for worker:", w.ID)
+        return
+    }
+    hub := w.shmReader.StartChannel(cam.ChannelID)
+    w.streamHubs[resp.ChannelID] = hub
+}
+
+func (w *Worker) StreamHubForCam(camId int) *stream.Hub {
+    cam := w.cameras[camId]
+    fmt.Println("[Go][Worker][StreamHubForCam] ", w.ID, camId, cam, cam.ChannelID)
+    return w.streamHubs[cam.ChannelID]
+}
+
+
+// Start up SHM reader when we receive SHM data from cpp worker
 func (w *Worker) startSHMReader(resp WorkerResponse) {
 
-    // Create a hub
-    // shub := stream.NewHub()
-
-    // Attach the WebSocket route
-    // mux.HandleFunc("GET /ws/stream/1", stream.StreamHandler(shub))
+    fmt.Println("[Go][Worker] start shm reader", w.ID)
 
     // Launch the reader in the background so it doesn't block the command loop
-    go StartStreamReader(strconv.Itoa(w.ID), 10, 3145728)
+    w.shmReader = shm.StartStreamReader(strconv.Itoa(w.ID), 10, resp.Size)
 
 }
 
@@ -129,7 +158,7 @@ func (w *Worker) SendWorkerID() error {
 }
 
 
-func (w *Worker) AssignCam(cam Camera) error {
+func (w *Worker) AssignCam(cam *Camera) error {
 
     w.mu.Lock()
     w.cameras[cam.ID] = cam
@@ -139,7 +168,7 @@ func (w *Worker) AssignCam(cam Camera) error {
 
 }
 
-func (w *Worker) StartCam(cam Camera) error {
+func (w *Worker) StartCam(cam *Camera) error {
 
     command := fmt.Sprintf("START %d %s", cam.ID, cam.url)
     return w.SendCommand(command)
@@ -186,6 +215,10 @@ func (w *Worker) handleCMDResponse(resp WorkerResponse) {
         w.handleStoppedStream(resp)
 
     } else if(resp.Status == "starting") {
+
+        w.updateCameraSHMChannel(resp)
+
+    } else if(resp.Status == "shm") {
 
         w.startSHMReader(resp)
 

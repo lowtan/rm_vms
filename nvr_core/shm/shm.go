@@ -1,11 +1,13 @@
-package process
+package shm
 
 import (
 	"encoding/binary"
+	// "log"
 	// "fmt"
 	"os"
 	"sync/atomic"
 	"syscall"
+
 	// "time"
 	"unsafe"
 )
@@ -86,18 +88,18 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 	return w, nil
 }
 
-func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
+func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
 	head := atomic.LoadUint32(&rb.Header.WriteHead)
 	tail := atomic.LoadUint32(&rb.Header.ReadTail)
 
 	if tail == head {
-		return nil, 0, false // Buffer is empty
+		return nil, 0, false, false // Buffer is empty
 	}
 
 	// Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
 	// C++ definitely wrapped here.
 	if tail+MetadataSize > rb.Capacity {
-		tail = 0 
+		tail = 0
 	}
 
 	// Read Metadata
@@ -108,7 +110,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 	if magic != MagicNumber {
 		// C++ skipped this section because the frame didn't fit. 
 		// Wrap the reader to 0.
-		tail = 0 
+		tail = 0
 
 		// Re-read metadata at index 0
 		metaBytes = rb.DataStart[tail : tail+MetadataSize]
@@ -119,7 +121,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 		if magic != MagicNumber {
 			// Emergency Recovery: Catch up to the writer's head to drop corrupted state
 			atomic.StoreUint32(&rb.Header.ReadTail, head)
-			return nil, 0, false
+			return nil, 0, false, false
 		}
 	}
 
@@ -127,7 +129,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 	// Note: frameSize is now at offset 4:8 because magic takes 0:4
 	frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
 	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
-	// isKeyFrame := metaBytes[16] // Available if you need it later
+	isKeyFrame := metaBytes[16] !=0 // Available if you need it later
 
 	start := tail + MetadataSize
 	end := start + frameSize
@@ -136,7 +138,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 	// Even with the magic number, if memory corruption occurs, prevent a crash.
 	if end > rb.Capacity {
 		atomic.StoreUint32(&rb.Header.ReadTail, head) // Drop and recover
-		return nil, 0, false
+		return nil, 0, false, false
 	}
 
 	// Copy Data safely
@@ -146,7 +148,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool) {
 	// Commit Read
 	atomic.StoreUint32(&rb.Header.ReadTail, end)
 
-	return frameData, timestamp, true
+	return frameData, timestamp, isKeyFrame, true
 }
 
 

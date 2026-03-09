@@ -30,9 +30,9 @@ func main() {
 	fmt.Printf("[Go Manager] Config Loaded. Storage: %s, Cameras: %d\n", 
 			cfg.Server.StoragePath, len(cfg.Cameras))
 
-	process.Startup(ctx, cfg)
+	pm := process.Startup(ctx, cfg)
 
-	go apiserver.Initiate(ctx, cfg)
+	go apiserver.Initiate(ctx, cfg, pm)
 
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()

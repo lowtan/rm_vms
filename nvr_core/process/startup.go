@@ -8,14 +8,14 @@ import (
 
 const CPP_WORKER_BIN = "./nvr_worker"
 
-func Startup(ctx context.Context, cfg *utils.Config) {
+func Startup(ctx context.Context, cfg *utils.Config) (*Manager) {
 
 	pm := NewManager(ctx, cfg, 4, CPP_WORKER_BIN)
 
 	if err := pm.StartAll(); err != nil {
 		log.Fatalf("Failed to start workers: %v", err)
 	}
-	defer pm.StopAll() // Cleanup on exit
+	// defer pm.StopAll() // Cleanup on exit
 
 	// Distribute Cameras
 	for _, cam := range cfg.Cameras {
@@ -25,5 +25,7 @@ func Startup(ctx context.Context, cfg *utils.Config) {
 			}
 		}
 	}
+
+	return pm;
 
 }

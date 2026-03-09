@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"nvr_core/process"
 	"nvr_core/utils"
 )
 
@@ -29,18 +30,27 @@ func NewNVRState() *NVRState {
 }
 
 type APIServer struct {
-	CFG *utils.Config
+	CFG   *utils.Config
 	State *NVRState
+	PM    *process.Manager
+	// SHub *stream.Hub
 }
 
-func Initiate(ctx context.Context, cfg *utils.Config) {
+func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager) {
 
 	log.Println("Starting API server")
 
 	state := NewNVRState()
-	api := &APIServer{State: state, CFG: cfg}
+
+	api := &APIServer{State: state, CFG: cfg, PM: pm}
 
 	mux := http.NewServeMux()
+
+	// mux.HandleFunc("GET /ws/stream/{id}", func(w http.ResponseWriter, r *http.Request) {
+	// 	// stream.ServeWs(hub, w, r)
+	// })
+
+	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 
 	mux.HandleFunc("GET /health", api.GetHealth)
 
