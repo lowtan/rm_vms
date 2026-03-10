@@ -144,7 +144,7 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 		f := stream.VideoFrame { IsKeyFrame: isKey, Payload: frameData }
 
 		bc.Broadcast <- f
-		fileDumpTest(frameData, r.workerName, channelID)
+		// fileDumpTest(frameData, r.workerName, channelID)
 
 	}
 
