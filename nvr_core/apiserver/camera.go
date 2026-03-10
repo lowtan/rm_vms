@@ -5,25 +5,23 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	// "sync"
-	// "time"
+	"nvr_core/process"
 )
 
 // GetCameras safely iterates over the sync.Map
 func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
-	var camList []Camera
+	var camList []*process.Camera
 
-	// Distribute Cameras
-	for _, cam := range s.CFG.Cameras {
-		if cam.Enabled {
-			camList = append(camList, Camera{
-				ID: cam.Name,
-				RTSPUrl: cam.URL,
-				Status: "",
-			})
-		}
-	}
-
+	// // Distribute Cameras
+	// for _, cam := range s.CFG.Cameras {
+	// 	if cam.Enabled {
+	// 		camList = append(camList, Camera{
+	// 			ID: cam.Name,
+	// 			RTSPUrl: cam.URL,
+	// 			Status: "",
+	// 		})
+	// 	}
+	// }
 
 	// s.State.Cameras.Range(func(key, value any) bool {
 	// 	if cam, ok := value.(Camera); ok {
@@ -31,6 +29,22 @@ func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
 	// 	}
 	// 	return true // continue iteration
 	// })
+
+	workers := s.PM.GetWorkers()
+
+	log.Printf("[GetCameras] workers(%d)\n", len(workers))
+
+	for _, worker := range workers {
+
+		cams := worker.GetCameras()
+		log.Printf("[GetCameras] cams (%d)\n", len(cams))
+		for _, cam := range cams {
+			camList = append(camList, cam)
+		}
+
+	}
+
+	log.Printf("[GetCameras] camList(%d)\n", len(camList))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(camList); err != nil {
@@ -41,7 +55,7 @@ func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
 
 // AddCamera stores the camera and triggers the IPC pipeline
 func (s *APIServer) AddCamera(w http.ResponseWriter, r *http.Request) {
-	var newCam Camera
+	var newCam process.Camera
 	
 	// Limit request body size to prevent memory exhaustion attacks
 	r.Body = http.MaxBytesReader(w, r.Body, 1024*10) // 10KB max

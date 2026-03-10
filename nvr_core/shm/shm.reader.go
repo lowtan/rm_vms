@@ -41,7 +41,7 @@ func StartStreamReader(workerName string, numChannels int, bufferSize int) (*Rea
 		return nil
 	}
 	
-	log.Printf("[Go Manager] Successfully connected to %s. Spawning readers...\n", shmName)
+	log.Printf("[Go Manager] Successfully connected to %s. Spawning the reader...\n", shmName)
 
 	reader := ReaderSHM{
 		workerName: workerName,
@@ -51,20 +51,12 @@ func StartStreamReader(workerName string, numChannels int, bufferSize int) (*Rea
 		channelStopper: make(map[int]*atomic.Bool),
 	}
 
-	// XXXXXXXXXXXXXX
-	// We are not going to read all the channels
-	// boot them up separately after we get camera starting
-	// status.
-	// 
-	// Spawn a Goroutine for each camera channel
-	// for i := 0; i < numChannels; i++ {
-	// 	go readChannelLoop(shmName, i, shm.Channels[i])
-	// }
-
-	// Note: In production, you would attach a context.Context here 
+	// TODO: In production, you would attach a context.Context here 
 	// to handle graceful shutdown and call shm.Close() when the worker dies.
 
 	// context.Context
+
+	log.Printf("[Go Manager] %s reader spawned\n", shmName)
 
 	return &reader;
 }

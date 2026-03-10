@@ -38,17 +38,13 @@ type APIServer struct {
 
 func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager) {
 
-	log.Println("Starting API server")
+	log.Println("Initializing API server")
 
 	state := NewNVRState()
 
 	api := &APIServer{State: state, CFG: cfg, PM: pm}
 
 	mux := http.NewServeMux()
-
-	// mux.HandleFunc("GET /ws/stream/{id}", func(w http.ResponseWriter, r *http.Request) {
-	// 	// stream.ServeWs(hub, w, r)
-	// })
 
 	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 

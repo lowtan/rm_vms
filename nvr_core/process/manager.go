@@ -7,6 +7,8 @@ import (
 	"nvr_core/utils"
 )
 
+
+
 // Manager handles the pool of workers
 type Manager struct {
 	cfg        *utils.Config
@@ -53,6 +55,10 @@ func (m *Manager) StopAll() {
 	}
 }
 
+func (m *Manager) GetWorkers() []*Worker {
+	return m.workers
+}
+
 // AssignCamera routes a camera to the correct worker (Sharding Logic)
 func (m *Manager) AssignCamera(camID int, url string) error {
 	if len(m.workers) == 0 {
@@ -67,7 +73,7 @@ func (m *Manager) AssignCamera(camID int, url string) error {
 
 	log.Printf("[Manager][AssignCamera] Routing Cam %d -> Worker %d\n", camID, workerIndex)
 
-	return targetWorker.AssignCam(&Camera{ camID, url, -1})
+	return targetWorker.AssignCam(NewCamera(camID, url))
 }
 
 func (m *Manager) CameraWorker(camID int) *Worker {

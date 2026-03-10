@@ -13,6 +13,7 @@ import (
 	"time"
     "nvr_core/shm"
     "nvr_core/stream"
+    "nvr_core/utils"
 )
 
 const LOGSEP = "==============================================\n"
@@ -23,12 +24,6 @@ type WorkerResponse struct {
     CamID     int    `json:"cam"`
     ChannelID int    `json:"channel"`
     Size      int    `json:"size"`
-}
-
-type Camera struct {
-    ID   int
-    url  string
-    ChannelID   int
 }
 
 // Worker represents a single C++ subprocess
@@ -44,6 +39,7 @@ type Worker struct {
     shmReader  *shm.ReaderSHM
     streamHubs map[int]*stream.Hub
     mu         sync.Mutex // Protects concurrent writes to Stdin
+    dmu         utils.DebugMutex
 }
 
 // NewWorker creates a struct but doesn't start the process yet
@@ -58,6 +54,8 @@ func NewWorker(id int, binaryPath string) *Worker {
 
 func (w *Worker) handleStoppedStream(resp WorkerResponse) {
 
+    w.cameras[resp.CamID].Status = "Stopped"
+
     time.Sleep(8 * time.Second)
 
     fmt.Println(LOGSEP + "[Go][Worker] restarting cam:", resp.CamID)
@@ -65,12 +63,22 @@ func (w *Worker) handleStoppedStream(resp WorkerResponse) {
 
 }
 
+func (w *Worker) updateCameraStatus(resp WorkerResponse) {
+
+    w.mu.Lock()
+    defer w.mu.Unlock()
+
+    cam := w.cameras[resp.CamID]
+    cam.Status = resp.Status
+
+}
 
 func (w *Worker) updateCameraSHMChannel(resp WorkerResponse) {
 
     fmt.Println(LOGSEP + "[Go][Worker] update SHM Channel cam:", resp.CamID, resp.ChannelID)
     cam := w.cameras[resp.CamID]
     cam.ChannelID = resp.ChannelID
+    cam.Status = "streaming"
 
     // Update SHM stream reader
     if(w.shmReader == nil) {
@@ -138,8 +146,8 @@ func (w *Worker) Start(ctx context.Context) error {
 
 // SendCommand is a thread-safe way to write to the worker
 func (w *Worker) SendCommand(cmd string) error {
-    w.mu.Lock()
-    defer w.mu.Unlock()
+    // w.mu.Lock()
+    // defer w.mu.Unlock()
 
     if w.Stdin == nil {
         return fmt.Errorf("worker %d is not running", w.ID)
@@ -161,6 +169,7 @@ func (w *Worker) SendWorkerID() error {
 func (w *Worker) AssignCam(cam *Camera) error {
 
     w.mu.Lock()
+    cam.WorkerID = w.ID
     w.cameras[cam.ID] = cam
     w.mu.Unlock()
 
@@ -170,7 +179,8 @@ func (w *Worker) AssignCam(cam *Camera) error {
 
 func (w *Worker) StartCam(cam *Camera) error {
 
-    command := fmt.Sprintf("START %d %s", cam.ID, cam.url)
+    cam.Status = "starting"
+    command := fmt.Sprintf("START %d %s", cam.ID, cam.Url)
     return w.SendCommand(command)
 
 }
@@ -202,6 +212,22 @@ func (w *Worker) Stop() {
     }
 }
 
+/**
+ * ======================================================
+ * Getters
+ * ======================================================
+ */
+
+func (w *Worker) GetCameras() []*Camera {
+    w.mu.Lock()         // Lock before reading the map
+    defer w.mu.Unlock() // Ensure it unlocks when the function finishes
+
+    cameraList := make([]*Camera, 0, len(w.cameras))
+    for _, camera := range w.cameras {
+        cameraList = append(cameraList, camera)
+    }
+    return cameraList
+}
 
 /**
  * ======================================================
@@ -215,6 +241,10 @@ func (w *Worker) handleCMDResponse(resp WorkerResponse) {
         w.handleStoppedStream(resp)
 
     } else if(resp.Status == "starting") {
+
+        w.updateCameraStatus(resp)
+
+    } else if(resp.Status == "streaming") {
 
         w.updateCameraSHMChannel(resp)
 
@@ -341,10 +371,13 @@ func (w *Worker) recoverWorker(ctx context.Context) {
         return
     }
 
+    // Copy camera list, preventing infinite lock
+    camsToRestart := utils.CopyMapValues(w.cameras, &w.mu)
+
     // Restore State: Re-assign all cameras that this worker was managing
     w.mu.Lock()
     defer w.mu.Unlock()
-    for _, cam := range w.cameras {
+    for _, cam := range camsToRestart {
         fmt.Printf("[Go][Worker %d] Restoring stream for Cam %d...\n", w.ID, cam.ID)
         w.StartCam(cam)
     }
