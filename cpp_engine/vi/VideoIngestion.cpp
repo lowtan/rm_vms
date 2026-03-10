@@ -24,7 +24,7 @@ void logUnusedOptions(AVDictionary* dict, const std::string& tag = "Stream") {
 
 // --- Constructor ---
 VideoIngestion::VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u)
-    : shm(mm), camID(id), url(u), stopSignal(false), fmtCtx(nullptr), options(nullptr)
+    : shm(mm), camID(id), url(u)
 {
     camName = "[Cam" + std::to_string(camID) + "]";
     shmChannelID = shm->ChannelForCamID(camID);
@@ -80,7 +80,7 @@ int VideoIngestion::startIngestion() {
     if (initVideoFilter() < 0) return cleanup();
 
     Log::info(camName + " Connected! Starting Ingestion Loop...");
-    Log::send("{\"status\":\"starting\", \"cam\":" + std::to_string(camID) + ", \"channel\":" + std::to_string(shmChannelID) + "}");
+    Log::send("{\"status\":\"streaming\", \"cam\":" + std::to_string(camID) + ", \"channel\":" + std::to_string(shmChannelID) + "}");
 
     // The Main Loop
     AVPacket* packet = av_packet_alloc();
@@ -207,6 +207,7 @@ int VideoIngestion::openInput() {
 
         std::cerr << camName << "[FFmpeg Error] Could not open source: " << url << std::endl;
         std::cerr << "Reason: " << errbuf << " (Code: " << ret << ")" << std::endl;
+        // Log::send("{\"status\":\"stopped\", \"cam\":" + std::to_string(camID) + "}");
 
         return -1;
     }
