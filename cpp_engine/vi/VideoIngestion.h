@@ -6,10 +6,13 @@
 #include "AVDictionary.h"
 #include "SharedMemory.h"
 
-extern "C" {
-#include <libavformat/avformat.h>
-}
-
+// --- Forward Declarations ---
+// Tell the compiler these are structs, which is all it needs to create pointers.
+// This completely removes the FFmpeg dependency from the header file.
+struct AVFormatContext;
+struct AVDictionary;
+struct AVBSFContext;
+struct AVPacket;
 
 class VideoIngestion
 {

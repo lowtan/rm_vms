@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"nvr_core/shm"
+	"nvr_core/stream"
+	"nvr_core/utils"
+	"os"
 	"os/exec"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
-    "nvr_core/shm"
-    "nvr_core/stream"
-    "nvr_core/utils"
 )
 
 const LOGSEP = "==============================================\n"
@@ -54,7 +55,11 @@ func NewWorker(id int, binaryPath string) *Worker {
 
 func (w *Worker) handleStoppedStream(resp WorkerResponse) {
 
-    w.cameras[resp.CamID].Status = "Stopped"
+    w.mu.Lock()
+    if cam, exists := w.cameras[resp.CamID]; exists {
+        cam.Status = "Stopped"
+    }
+    w.mu.Unlock()
 
     time.Sleep(8 * time.Second)
 
@@ -76,17 +81,26 @@ func (w *Worker) updateCameraStatus(resp WorkerResponse) {
 func (w *Worker) updateCameraSHMChannel(resp WorkerResponse) {
 
     fmt.Println(LOGSEP + "[Go][Worker] update SHM Channel cam:", resp.CamID, resp.ChannelID)
+
+    w.mu.Lock()
     cam := w.cameras[resp.CamID]
     cam.ChannelID = resp.ChannelID
     cam.Status = "streaming"
+    existingHub := w.streamHubs[resp.ChannelID]
+    w.mu.Unlock()
 
     // Update SHM stream reader
     if(w.shmReader == nil) {
         fmt.Println("[Go][Worker] no shm reader for worker:", w.ID)
         return
     }
-    hub := w.shmReader.StartChannel(cam.ChannelID)
+
+    hub := w.shmReader.StartChannel(cam.ChannelID, existingHub)
+
+    w.mu.Lock()
     w.streamHubs[resp.ChannelID] = hub
+    w.mu.Unlock()
+
 }
 
 func (w *Worker) StreamHubForCam(camId int) *stream.Hub {
@@ -346,23 +360,27 @@ func (w *Worker) recoverWorker(ctx context.Context) {
     // (e.g., due to a bad config), this prevents an infinite CPU-burning crash loop.
     time.Sleep(3 * time.Second)
 
-    // --- THE CLEANUP STRATEGY ---
-    // TODO: we shall deal with SHM data corruption issue later
-    // w.mu.Lock()
-    // for _, cam := range w.cameras {
-    //     // Define the path to the shared memory block for this specific camera
-    //     shmPath := fmt.Sprintf("/dev/shm/nvr_buffer_cam_%d", cam.ID)
-        
-    //     // Delete the corrupted memory block. 
-    //     // We ignore os.IsNotExist errors in case the C++ worker never created it.
-    //     if err := os.Remove(shmPath); err != nil && !os.IsNotExist(err) {
-    //         fmt.Printf("\033[33m[Go][Worker %d] Warning: failed to unlink SHM for cam %d: %v\033[0m\n", w.ID, cam.ID, err)
-    //     } else {
-    //         fmt.Printf("[Go][Worker %d] Cleared shared memory for cam %d\n", w.ID, cam.ID)
-    //     }
-    // }
-    // w.mu.Unlock()
-    // ----------------------------
+    var shmPath string
+
+    // CLEANUP: Destroy the old SHM reader and its goroutines
+    if w.shmReader != nil {
+        shmPath = w.shmReader.FilePath()
+        w.shmReader.Close()
+        w.shmReader = nil
+    }
+
+    // WIPE: Delete the corrupted shared memory file from the OS
+    if shmPath != "" {
+        if err := os.Remove(shmPath); err != nil {
+            if !os.IsNotExist(err) {
+                fmt.Printf("\033[33m[Go][Worker %d] Warning: failed to unlink SHM %s: %v\033[0m\n", w.ID, shmPath, err)
+            }
+        } else {
+            fmt.Printf("[Go][Worker %d] Successfully wiped corrupted shared memory at %s\n", w.ID, shmPath)
+        }
+    } else {
+        fmt.Printf("\033[33m[Go][Worker %d] Warning: No SHM path found to wipe.\033[0m\n", w.ID)
+    }
 
     // Restart the process
     if err := w.Start(ctx); err != nil {

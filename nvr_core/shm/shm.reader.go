@@ -61,41 +61,39 @@ func StartStreamReader(workerName string, numChannels int, bufferSize int) (*Rea
 	return &reader;
 }
 
+func (r *ReaderSHM) FilePath() string {
+	if r.worker != nil && r.worker.file != nil {
+		return r.worker.file.Name() // Returns exactly what was passed to os.OpenFile
+	}
+	return ""
+}
 
-
-func (r *ReaderSHM) StartChannel(channelID int) *stream.Hub {
+func (r *ReaderSHM) StartChannel(channelID int, existingHub *stream.Hub) *stream.Hub {
 
 	rb := r.worker.Channels[channelID]
 	if(rb == nil) {
 
 		log.Printf("[startChannel][%d] no ring buffer!\n", channelID);
 		return nil;
+	}
 
-	} else {
+	hub := existingHub
+	if(hub == nil) {
 
-		hub := r.channelHub[channelID]
-		if(hub == nil) {
-
-			log.Printf("[startChannel][%d] streamer starting!\n", channelID);
-			hub = stream.NewHub()
-			r.channelHub[channelID] = hub
-
-			go hub.Run()
-
-			stopper := &atomic.Bool{}
-			stopper.Store(false)
-			r.channelStopper[channelID] = stopper
-			go r.readChannelLoop(stopper, channelID, rb, hub)
-
-		} else {
-
-			log.Printf("[startChannel][%d] streamer is already running!\n%v", channelID, hub);
-
-		}
-
-		return hub
+		log.Printf("[startChannel][%d] streamer starting!\n", channelID);
+		hub = stream.NewHub()
+		go hub.Run()
 
 	}
+
+	r.channelHub[channelID] = hub
+	stopper := &atomic.Bool{}
+	stopper.Store(false)
+	r.channelStopper[channelID] = stopper
+
+	go r.readChannelLoop(stopper, channelID, rb, hub)
+
+	return hub
 
 }
 
@@ -140,6 +138,21 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 
 	}
 
+}
+
+// Close safely stops all polling goroutines and unmaps the shared memory
+func (r *ReaderSHM) Close() {
+	log.Printf("[shm.reader] Closing SHM Reader for %s\n", r.workerName)
+	
+	// 1. Signal all readChannelLoop goroutines to exit
+	for _, stopper := range r.channelStopper {
+		stopper.Store(true)
+	}
+
+	// 2. Unmap the memory to prevent OS RAM leaks
+	if r.worker != nil {
+		r.worker.Close()
+	}
 }
 
 func fileDumpTest(frame []byte, worker string, channel int) {

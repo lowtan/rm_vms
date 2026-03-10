@@ -6,6 +6,11 @@
 
 #include "Log.h"
 
+extern "C" {
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h> // You may need this for av_packet_alloc, etc.
+}
+
 /**
  * Checks for any options that FFmpeg did NOT consume.
  * Useful for debugging typos (e.g. "timeout" vs "stimeout").
