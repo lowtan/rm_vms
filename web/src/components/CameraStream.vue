@@ -104,11 +104,10 @@ const cleanup = () => {
 };
 </script>
 
-<style scoped>
+<style>
 .camera-container {
   position: relative;
   width: 100%;
-  max-width: 800px;
   background: #000;
   aspect-ratio: 16 / 9;
 }

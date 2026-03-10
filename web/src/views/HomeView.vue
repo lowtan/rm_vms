@@ -5,6 +5,6 @@ import CameraStream from '../components/CameraStream.vue'
 
 <template>
   <main>
-    <CameraStream :camId="1" />
+    <TheWelcome message="Welcome" />
   </main>
 </template>
