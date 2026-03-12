@@ -12,14 +12,6 @@ import (
 	"nvr_core/utils"
 )
 
-// Camera represents the configuration of an RTSP stream
-type Camera struct {
-	ID       string `json:"id"`
-	RTSPUrl  string `json:"rtsp_url"`
-	WorkerID string `json:"worker_id"`
-	Status   string `json:"status"`
-}
-
 // NVRState uses sync.Map for highly concurrent, lock-free (mostly) reads/writes
 type NVRState struct {
 	Cameras sync.Map

@@ -3,8 +3,11 @@
 #include <thread>
 #include <atomic>
 
+#include "Log.h"
 #include "AVDictionary.h"
 #include "SharedMemory.h"
+#include "Recording.h"
+#include "SafeQueue.h"
 
 // --- Forward Declarations ---
 // Tell the compiler these are structs, which is all it needs to create pointers.
@@ -37,6 +40,8 @@ private:
     // Threading controls
     std::atomic<bool> stopSignal{false}; // Each camera has its own stop flag
     std::thread workerThread;            // The thread handling the loop
+    std::thread diskWriterThread;
+    SafeQueue<AVPacket*> diskWriterQueue;
 
     // --- Stream Tracking ---
     int videoStreamIndex = -1;
@@ -49,10 +54,12 @@ private:
 
     // --- Setup Helpers ---
     void findStreamIndices();
+    void initDiskWriter();
     int initVideoFilter();
 
     // --- Packet Routing & Processing ---
     void routePacket(AVPacket* packet);
     void ingestVideo(AVPacket* packet);
     void ingestAudio(AVPacket* packet);
+    void packetToDiskWriter(AVPacket* packet);
 };

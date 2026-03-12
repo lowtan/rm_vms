@@ -4,27 +4,9 @@
 // #include <string>
 #include <chrono>
 
-#include "Log.h"
-
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h> // You may need this for av_packet_alloc, etc.
-}
-
-/**
- * Checks for any options that FFmpeg did NOT consume.
- * Useful for debugging typos (e.g. "timeout" vs "stimeout").
- * * @param dict The dictionary to check.
- * @param tag  Optional string to identify which stream this belongs to.
- */
-void logUnusedOptions(AVDictionary* dict, const std::string& tag = "Stream") {
-    AVDictionaryEntry* t = nullptr;
-    
-    // Iterate over all remaining entries in the dictionary
-    while ((t = av_dict_get(dict, "", t, AV_DICT_IGNORE_SUFFIX))) {
-        std::cerr << "[Warning][" << tag << "] Unused Option: Key='" << t->key 
-                  << "', Value='" << t->value << "'" << std::endl;
-    }
 }
 
 // --- Constructor ---
@@ -52,6 +34,14 @@ VideoIngestion::~VideoIngestion() {
     // Signal the thread to stop
     stopSignal = true;
 
+    // Wake up the disk writer thread and tell it to exit safely
+    diskWriterQueue.push(nullptr);
+
+    // Join the disk writer thread
+    if (diskWriterThread.joinable()) {
+        diskWriterThread.join();
+    }
+
     // Wait for the thread to finish (Join)
     // If we don't join, the thread might try to access 'this' after the object is destroyed -> Crash.
     if (workerThread.joinable()) {
@@ -61,8 +51,11 @@ VideoIngestion::~VideoIngestion() {
 }
 
 
-
-// --- Private Method: startIngestion ---
+/**
+ * =========================================================
+ * --- Private Method: startIngestion ---
+ * =========================================================
+ */
 int VideoIngestion::startIngestion() {
     avformat_network_init();
     options = configureAVDictionary(nullptr);
@@ -84,6 +77,12 @@ int VideoIngestion::startIngestion() {
     // Setup Filters
     if (initVideoFilter() < 0) return cleanup();
 
+    // ---------------------------------------------------------
+    // SPAWN WRITER THREAD HERE
+    // Now that we have AVStreams, we can pass codec parameters to the writer
+    // ---------------------------------------------------------
+    initDiskWriter();
+
     Log::info(camName + " Connected! Starting Ingestion Loop...");
     Log::send("{\"status\":\"streaming\", \"cam\":" + std::to_string(camID) + ", \"channel\":" + std::to_string(shmChannelID) + "}");
 
@@ -100,11 +99,17 @@ int VideoIngestion::startIngestion() {
         // Reset the packet for the next av_read_frame iteration
         av_packet_unref(packet); 
     }
-    
+
     av_packet_free(&packet);
     return cleanup();
 }
 
+
+/**
+ * =========================================================
+ * Initializations
+ * =========================================================
+ */
 void VideoIngestion::findStreamIndices() {
     videoStreamIndex = -1;
     audioStreamIndex = -1;
@@ -116,6 +121,18 @@ void VideoIngestion::findStreamIndices() {
             audioStreamIndex = i;
         }
     }
+}
+
+void VideoIngestion::initDiskWriter() {
+
+    diskWriterThread = std::thread([this]() {
+        AVStream* vStream = (videoStreamIndex != -1) ? fmtCtx->streams[videoStreamIndex] : nullptr;
+        AVStream* aStream = (audioStreamIndex != -1) ? fmtCtx->streams[audioStreamIndex] : nullptr;
+        
+        // Pass both streams to the worker
+        writerWorker(this->diskWriterQueue, vStream, aStream, this->camID);
+    });
+
 }
 
 int VideoIngestion::initVideoFilter() {
@@ -149,6 +166,29 @@ void VideoIngestion::routePacket(AVPacket* packet) {
     // The orchestrator loop will safely unref it.
 }
 
+/**
+ * =========================================================
+ * Disk Writer
+ * =========================================================
+ */
+
+void VideoIngestion::packetToDiskWriter(AVPacket* packet) {
+
+    AVPacket* cloneForDisk = av_packet_alloc();
+    if (av_packet_ref(cloneForDisk, packet) >= 0) {
+
+        // If the queue rejects the packet, WE must free the clone.
+        if (!diskWriterQueue.push(cloneForDisk)) {
+            av_packet_unref(cloneForDisk);
+            av_packet_free(&cloneForDisk);
+        }
+
+    } else {
+        av_packet_free(&cloneForDisk);
+        Log::error(camName + "Failed to ref-count packet for disk queue.");
+    }
+
+}
 
 /**
  * =========================================================
@@ -166,7 +206,7 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
 
             if (waitForKeyFrame) {
                 if (isKey) {
-                    Log::info(camName + " [SHM] First key frame found.");
+                    Log::info(camName + " [ingestVideo] First key frame found.");
                     waitForKeyFrame = false;
                 } else {
                     av_packet_unref(packet); 
@@ -175,11 +215,14 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
             }
 
             try {
+
                 if (shm->WriteFrame(shmChannelID, packet->data, packet->size, packet->pts, isKey) < 0) {
-                    Log::error(camName + " [SHM] Failed to write frame data.");
+                    Log::error(camName + " [ingestVideo] Failed to write frame data.");
                 }
+                packetToDiskWriter(packet);
+
             } catch(...) {
-                Log::error(camName + " [SHM] Caught exception writing frame data.");
+                Log::error(camName + " [ingestVideo] Caught exception writing frame data.");
             }
 
             // Clean up the filtered packet
@@ -189,7 +232,19 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
 }
 
 void VideoIngestion::ingestAudio(AVPacket* packet) {
+
     // TODO: Implement audio extraction and routing to Audio SHM Buffer
+
+    // A/V Sync Gatekeeper: Drop audio until video has established a keyframe.
+    // This prevents "black screen with audio" at the start of recordings/streams.
+    if (waitForKeyFrame) {
+        // We haven't found a video I-Frame yet. Discard this audio packet.
+        av_packet_unref(packet);
+        return;
+    }
+
+    packetToDiskWriter(packet);
+
 }
 
 

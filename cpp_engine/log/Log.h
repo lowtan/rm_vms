@@ -18,6 +18,8 @@ public:
     static void error(const char* format, ...);
     static void PError(const std::string& prefix);
 
+    static void progress(const std::string& msg);
+
 private:
     // A single shared lock for the entire application
     static std::mutex s_Mutex;

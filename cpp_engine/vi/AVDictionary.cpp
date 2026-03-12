@@ -1,5 +1,9 @@
 #include "AVDictionary.h"
 
+extern "C" {
+#include <libavformat/avformat.h>
+}
+
 // Standard AVDictionary setups for NVR recording efficiency
 AVDictionary* configureAVDictionary(AVDictionary* options) {
 
@@ -16,6 +20,12 @@ AVDictionary* configureAVDictionary(AVDictionary* options) {
     // This prevents "zombie" threads hanging your system.
     av_dict_set(&options, "stimeout", "5000000", 0); 
 
+    // I/O Timeout
+    // Acts as a fallback timeout for the underlying TCP connection phase 
+    // (during avformat_open_input). Also in microseconds.
+    av_dict_set(&options, "rw_timeout", "5000000", 0);
+
+        // 4. Minimize Latency
     // Increase the Kernel Socket Buffer.
     // 64 cameras x 8Mbps = Huge throughput.
     // If the buffer is too small, the OS drops packets before your app sees them.
@@ -48,4 +58,20 @@ AVDictionary* configureAVDictionary(AVDictionary* options) {
 
     return options;
 
+}
+
+
+/**
+ * Checks for any options that FFmpeg did NOT consume.
+ * Useful for debugging typos (e.g. "timeout" vs "stimeout").
+ * * @param dict The dictionary to check.
+ * @param tag  Optional string to identify which stream this belongs to.
+ */
+void logUnusedOptions(AVDictionary* dict, const std::string& tag) {
+    AVDictionaryEntry* t = nullptr;
+    
+    // Iterate over all remaining entries in the dictionary
+    while ((t = av_dict_get(dict, "", t, AV_DICT_IGNORE_SUFFIX))) {
+        Log::error("[Warning][" + tag + "] Unused Option: Key='" + t->key + "', Value='" + t->value + "'");
+    }
 }

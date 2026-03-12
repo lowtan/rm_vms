@@ -1,10 +1,13 @@
+#pragma once
+
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <iostream>
 
-template <typename T>
+#include "Log.h"
 
+template <typename T>
 class SafeQueue {
 private:
     std::queue<T> queue;
@@ -13,23 +16,24 @@ private:
     size_t max_size; // Max items before we start dropping frames
 
 public:
-    SafeQueue(size_t limit = 1000) : max_size(limit) {}
+    explicit SafeQueue(size_t limit = 1000) : max_size(limit) {}
 
     // PUSH: Used by the Ingestion Thread
-    void push(T item) {
+    // Returns false if the queue is full so the caller can free the memory.
+    bool push(T item) {
         std::unique_lock<std::mutex> lock(mtx);
         
-        // Safety: If queue is full (Disk is too slow?), drop the packet to save RAM.
+        // Safety: If queue is full (Disk is too slow), reject the packet.
         if (queue.size() >= max_size) {
-            std::cerr << "WARNING: Queue full! Dropping frame." << std::endl;
-            // In a real NVR, you might want to free the memory of 'item' here
-            // depending on how you manage pointers.
-            return; 
+            Log::error("WARNING: Disk Writer Queue full! Dropping frame.");
+            return false;
         }
 
         queue.push(item);
         lock.unlock(); // Unlock before notifying to save CPU cycles
         cv.notify_one(); // Wake up the writer thread
+        
+        return true;
     }
 
     // POP: Used by the Writer Thread
@@ -43,5 +47,11 @@ public:
         T item = queue.front();
         queue.pop();
         return item;
+    }
+
+    // Utility to check current size if needed
+    size_t size() {
+        std::lock_guard<std::mutex> lock(mtx);
+        return queue.size();
     }
 };

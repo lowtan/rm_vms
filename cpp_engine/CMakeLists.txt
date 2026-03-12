@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(nvr_worker)
 
 set(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find FFmpeg Libraries
 find_package(PkgConfig REQUIRED)
@@ -18,9 +18,10 @@ file(GLOB_RECURSE VI_CPP "vi/*.cpp")
 file(GLOB_RECURSE LOG_CPP "log/*.cpp")
 file(GLOB_RECURSE MEMORY_CPP "memory/*.cpp")
 file(GLOB_RECURSE UTILS_CPP "utils/*.cpp")
-# file(GLOB_RECURSE RECRDR_CPP "storage/*.cpp")
+file(GLOB_RECURSE STORAGE_CPP "storage/*.cpp")
+file(GLOB_RECURSE QUEUE_CPP "queue/*.cpp")
 
-add_executable(nvr_worker main.cpp ${VI_CPP} ${LOG_CPP} ${UTILS_CPP} ${MEMORY_CPP})
+add_executable(nvr_worker main.cpp ${VI_CPP} ${LOG_CPP} ${UTILS_CPP} ${MEMORY_CPP} ${STORAGE_CPP} ${QUEUE_CPP})
 
 # Header search folders
 target_include_directories(nvr_worker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -28,6 +29,8 @@ target_include_directories(nvr_worker PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
                         ${CMAKE_CURRENT_SOURCE_DIR}/log
                         ${CMAKE_CURRENT_SOURCE_DIR}/utils
                         ${CMAKE_CURRENT_SOURCE_DIR}/memory
+                        ${CMAKE_CURRENT_SOURCE_DIR}/storage
+                        ${CMAKE_CURRENT_SOURCE_DIR}/queue
                         )
 
 target_link_libraries(nvr_worker

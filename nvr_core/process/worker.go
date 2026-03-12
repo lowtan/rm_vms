@@ -250,6 +250,7 @@ func (w *Worker) GetCameras() []*Camera {
  */
 
 func (w *Worker) handleCMDResponse(resp WorkerResponse) {
+    // fmt.Printf("[Go][handleCMDResponse] Received Update -> Cam %d Status: %s\n", resp.CamID, resp.Status)
     if(resp.Status == "stopped") {
 
         w.handleStoppedStream(resp)
@@ -279,7 +280,6 @@ func (w *Worker) connectCMDIPC() {
             var resp WorkerResponse
             // If it's valid JSON, print prettily
             if err := json.Unmarshal([]byte(text), &resp); err == nil {
-                fmt.Printf("[Go][Worker] Received Update -> Cam %d Status: %s\n", resp.CamID, resp.Status)
                 w.handleCMDResponse(resp);
             } else {
                 fmt.Printf("\033[38;2;0;200;0m%s\033[0m\n", text)

@@ -33,6 +33,15 @@ void Log::error(const std::string& msg) {
     std::cerr << "[cpp_engine][err] " << msg << std::endl;
 }
 
+void Log::progress(const std::string& msg) {
+    std::lock_guard<std::mutex> lock(s_Mutex);
+
+    // \r moves cursor to the start.
+    // \033[K is an ANSI escape code that clears the line from the cursor to the end.
+    // std::flush forces it to draw immediately.
+    std::cout << "\r\033[K " << msg << std::flush;
+}
+
 // "Printf-style" version
 void Log::error(const char* format, ...) {
     // A fixed buffer is usually sufficient for log lines (fast stack allocation)
