@@ -1,7 +1,7 @@
 package shm
 
 import (
-	"encoding/binary"
+	// "encoding/binary"
 	// "log"
 	// "fmt"
 	"os"
@@ -40,6 +40,7 @@ type RingBufferHeader struct {
 	StreamID   uint32
 	_padding   [48]byte
 }
+
 
 func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*WorkerSHM, error) {
 	// Open File
@@ -88,12 +89,12 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 	return w, nil
 }
 
-func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, uint8, bool) {
+func (rb *RingBuffer) ReadFrame() (FrameMetadata, []byte, bool) {
 	head := atomic.LoadUint32(&rb.Header.WriteHead)
 	tail := atomic.LoadUint32(&rb.Header.ReadTail)
 
 	if tail == head {
-		return nil, 0, false, 0, false // Buffer is empty
+		return FrameMetadata{}, nil, false // Buffer is empty
 	}
 
 	// Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
@@ -103,8 +104,9 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, uint8, bool) {
 	}
 
 	// Read Metadata
+	meta := FrameMetadata{}
 	metaBytes := rb.DataStart[tail : tail+MetadataSize]
-	magic := binary.LittleEndian.Uint32(metaBytes[0:4])
+	magic := meta.GetMagic(metaBytes)
 
 	// Wrap-Around Detection
 	if magic != MagicNumber {
@@ -114,42 +116,43 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, uint8, bool) {
 
 		// Re-read metadata at index 0
 		metaBytes = rb.DataStart[tail : tail+MetadataSize]
-		magic = binary.LittleEndian.Uint32(metaBytes[0:4])
+		magic = meta.GetMagic(metaBytes)
 
 		// If it's STILL wrong, the reader has fallen completely out of sync 
 		// (e.g., C++ overwrote the data before Go could read it).
 		if magic != MagicNumber {
 			// Emergency Recovery: Catch up to the writer's head to drop corrupted state
 			atomic.StoreUint32(&rb.Header.ReadTail, head)
-			return nil, 0, false, 0, false
+			return FrameMetadata{}, nil, false
 		}
 	}
 
+	meta.LoadFrom(metaBytes)
 	// Extract Metadata
 	// Note: frameSize is now at offset 4:8 because magic takes 0:4
-	frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
-	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
-	isKeyFrame := metaBytes[16] !=0 // Available if you need it later
-	mediaType := metaBytes[17]
+	// frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
+	// timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
+	// isKeyFrame := metaBytes[16] !=0 // Available if you need it later
+	// mediaType := metaBytes[17]
 
 	start := tail + MetadataSize
-	end := start + frameSize
+	end := start + meta.FrameSize
 
 	// Ultimate Panic Fail-Safe
 	// Even with the magic number, if memory corruption occurs, prevent a crash.
 	if end > rb.Capacity {
 		atomic.StoreUint32(&rb.Header.ReadTail, head) // Drop and recover
-		return nil, 0, false, 0, false
+		return FrameMetadata{}, nil, false
 	}
 
 	// Copy Data safely
-	frameData := make([]byte, frameSize)
+	frameData := make([]byte, meta.FrameSize)
 	copy(frameData, rb.DataStart[start:end])
 
 	// Commit Read
 	atomic.StoreUint32(&rb.Header.ReadTail, end)
 
-	return frameData, timestamp, isKeyFrame, mediaType, true
+	return meta, frameData, true
 }
 
 

@@ -129,7 +129,7 @@ public:
     }
 
     // Returns false if buffer is full
-    bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey, uint8_t mediaType) override {
+    bool WriteFrame(int channelIdx, const FrameMetadata& meta, const uint8_t* data) override {
         if (channelIdx < 0 || channelIdx >= _channels.size()) return false;
 
         ChannelCtx& ch = _channels[channelIdx];
@@ -140,8 +140,9 @@ public:
         // readTail is handled by reader (Go Worker) for marking reading process.
         uint32_t tail = ch.header->readTail.load(std::memory_order_acquire);
 
+        size_t size = static_cast<size_t>(meta.frameSize);
         size_t totalNeeded = sizeof(FrameMetadata) + size;
-        
+
         // Calculate Next Position
         uint32_t nextHead = head + totalNeeded;
         bool wrapped = false;
@@ -168,12 +169,12 @@ public:
         }
 
         // Write Metadata
-        FrameMetadata meta;
-        meta.magic = 0xFFAABBCC;
-        meta.frameSize = static_cast<uint32_t>(size);
-        meta.timestamp = timestamp;
-        meta.isKeyFrame = isKey ? 1 : 0;
-        meta.mediaType = mediaType;
+        // FrameMetadata meta;
+        // meta.magic = WrapMagicNumber;
+        // meta.frameSize = static_cast<uint32_t>(size);
+        // meta.timestamp = timestamp;
+        // meta.isKeyFrame = isKey ? 1 : 0;
+        // meta.mediaType = mediaType;
 
         uint8_t* writePtr = ch.dataStart + effectiveWriteStart;
         memcpy(writePtr, &meta, sizeof(FrameMetadata));

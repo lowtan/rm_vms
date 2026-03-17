@@ -112,6 +112,7 @@ void VideoIngestion::findStreamIndices() {
     
     if (vIdx >= 0) {
         videoStreamIndex = vIdx;
+        videoCodecID = fmtCtx->streams[vIdx]->codecpar->codec_id;
         // Log::info(camName + " Found Video Stream at index: " + std::to_string(videoStreamIndex));
     }
 
@@ -119,6 +120,7 @@ void VideoIngestion::findStreamIndices() {
     int aIdx = av_find_best_stream(fmtCtx, AVMEDIA_TYPE_AUDIO, -1, vIdx, nullptr, 0);
     if (aIdx >= 0) {
         audioStreamIndex = aIdx;
+        audioCodecID = fmtCtx->streams[aIdx]->codecpar->codec_id;
         // Log::info(camName + " Found Audio Stream at index: " + std::to_string(audioStreamIndex));
     }
 
@@ -203,6 +205,30 @@ void VideoIngestion::packetToDiskWriter(AVPacket* packet) {
  * Ingestion
  * =========================================================
  */
+FrameMetadata VideoIngestion::makeFrameMetadataV(AVPacket* packet, bool isKey) {
+    // Construct the metadata cleanly
+    FrameMetadata meta;
+    meta.timestamp = packet->pts;
+    meta.magic = WrapMagicNumber;
+    meta.frameSize = packet->size;
+    meta.isKeyFrame = isKey ? 1 : 0;
+    meta.codecID = videoCodecID;
+    meta.mediaType = static_cast<uint8_t>(MediaType::VIDEO);
+    return meta;
+}
+
+FrameMetadata VideoIngestion::makeFrameMetadataA(AVPacket* packet) {
+    // Construct the metadata cleanly
+    FrameMetadata meta;
+    meta.timestamp = packet->pts;
+    meta.magic = WrapMagicNumber;
+    meta.frameSize = packet->size;
+    meta.isKeyFrame = 0;
+    meta.codecID = audioCodecID;
+    meta.mediaType = static_cast<uint8_t>(MediaType::AUDIO);
+    return meta;
+}
+
 void VideoIngestion::ingestVideo(AVPacket* packet) {
     // Send raw packet to the filter
     if (av_bsf_send_packet(bsfCtx, packet) == 0) {
@@ -226,8 +252,11 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
             }
 
             try {
+
+                FrameMetadata meta = makeFrameMetadataV(bsfPacket, isKey);
+
                 // Use bsfPacket here!
-                if (shm->WriteFrame(shmChannelID, bsfPacket->data, bsfPacket->size, bsfPacket->pts, isKey, 0) < 0) {
+                if (shm->WriteFrame(shmChannelID, meta, bsfPacket->data) < 0) {
                     Log::error(camName + " [ingestVideo] Failed to write frame data.");
                 }
                 packetToDiskWriter(bsfPacket);
@@ -256,7 +285,8 @@ void VideoIngestion::ingestAudio(AVPacket* packet) {
     // Audio frames do not have "Keyframes" in the same way video does, 
     // so we pass 'false' for the isKey parameter.
     try {
-        if (shm->WriteFrame(shmChannelID, packet->data, packet->size, packet->pts, false, 1) < 0) {
+        FrameMetadata meta = makeFrameMetadataA(packet);
+        if (shm->WriteFrame(shmChannelID, meta, packet->data) < 0) {
             Log::error(camName + " [SHM] Failed to write audio frame.");
         }
     } catch(...) {

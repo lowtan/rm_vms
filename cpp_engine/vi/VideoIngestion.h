@@ -46,6 +46,8 @@ private:
     // --- Stream Tracking ---
     int videoStreamIndex = -1;
     int audioStreamIndex = -1;
+    uint32_t videoCodecID = -1;
+    uint32_t audioCodecID = -1;
     bool waitForKeyFrame = true;       // Ensures we drop P-frames until our first IDR
 
     int startIngestion();       // The main worker thread loop
@@ -57,6 +59,8 @@ private:
     void findStreamIndices();
     void initDiskWriter();
     int initVideoFilter();
+    FrameMetadata makeFrameMetadataV(AVPacket* packet, bool isKey);
+    FrameMetadata makeFrameMetadataA(AVPacket* packet);
 
     // --- Packet Routing & Processing ---
     void routePacket(AVPacket* packet);

@@ -6,6 +6,7 @@ import (
 	"log"
 	"nvr_core/stream"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -16,6 +17,7 @@ type ReaderSHM struct {
 	camChannels    map[int]int
 	channelHub     map[int]*stream.Hub
 	channelStopper map[int]*atomic.Bool
+	wg             sync.WaitGroup //
 }
 
 // StartStreamReader connects to a Worker's SHM and starts reading its channels.
@@ -91,6 +93,7 @@ func (r *ReaderSHM) StartChannel(channelID int, existingHub *stream.Hub) *stream
 	stopper.Store(false)
 	r.channelStopper[channelID] = stopper
 
+	r.wg.Add(1)
 	go r.readChannelLoop(stopper, channelID, rb, hub)
 
 	return hub
@@ -107,6 +110,9 @@ func (r *ReaderSHM) stopChannel(channelID int) {
 
 // readChannelLoop continuously polls a specific RingBuffer for new frames
 func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBuffer, bc *stream.Hub) {
+
+	defer r.wg.Done() // Ensure counter decrements when loop exits safely
+
 	log.Printf("[Go][shm][readChannelLoop] Started reading loop for %s Channel %d\n", r.workerName, channelID)
 
 	for {
@@ -117,7 +123,7 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 
 		// Attempt to read a frame
 		// frameData, timestamp, ok := rb.ReadFrame()
-		frameData, _, isKey, mediaType, ok := rb.ReadFrame()
+		meta, frameData, ok := rb.ReadFrame()
 
 		if !ok {
 			// Buffer is empty.
@@ -131,7 +137,13 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 		// frameData now holds the raw video bytes (e.g., H.264 NAL units).
 		// You can route this data to disk, a WebSocket, or a WebRTC pipeline.
 
-		f := stream.StreamPacket { IsKeyFrame: isKey, Payload: frameData, MediaType: mediaType }
+		f := stream.StreamPacket {
+			IsKeyFrame: meta.IsKeyFrame != 0,
+			Payload: frameData,
+			MediaType: meta.MediaType,
+			CodecID:   meta.CodecID,
+			// Timestamp: meta.Timestamp,
+		}
 
 		bc.Broadcast <- f
 		// fileDumpTest(frameData, r.workerName, channelID)
@@ -144,12 +156,15 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 func (r *ReaderSHM) Close() {
 	log.Printf("[shm.reader] Closing SHM Reader for %s\n", r.workerName)
 	
-	// 1. Signal all readChannelLoop goroutines to exit
+	// Signal all readChannelLoop goroutines to exit
 	for _, stopper := range r.channelStopper {
 		stopper.Store(true)
 	}
 
-	// 2. Unmap the memory to prevent OS RAM leaks
+	// Wait for all goroutines to finish their current loop and exit
+	r.wg.Wait()
+
+	// Now we can unmap the memory for worker
 	if r.worker != nil {
 		r.worker.Close()
 	}

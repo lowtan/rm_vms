@@ -10,13 +10,19 @@
 
 #define WrapMagicNumber 0xFFAABBCC
 
+enum class MediaType : uint8_t {
+    VIDEO = 0,
+    AUDIO = 1
+};
+
 struct FrameMetadata {
-    uint32_t magic;
-    uint32_t frameSize;    // Size of the actual video data
-    uint64_t timestamp;    // Unix timestamp or PTS
-    uint8_t  isKeyFrame;   // 1 = I-Frame, 0 = P/B-Frame
-    uint8_t mediaType;
-    uint8_t  _padding[46]; // Pad to 64 bytes for alignment
+    uint64_t timestamp;    // 8 bytes (Offset 0)
+    uint32_t magic;        // 4 bytes (Offset 8)
+    uint32_t frameSize;    // 4 bytes (Offset 12)
+    uint32_t codecID;      // 4 bytes (Offset 16)
+    uint8_t  isKeyFrame;   // 1 byte  (Offset 20)
+    uint8_t  mediaType;    // 1 byte  (Offset 21)
+    uint8_t  _padding[42]; // 42 bytes(Offset 22) -> Total: EXACTLY 64 bytes
 };
 
 struct RingBufferHeader {
@@ -47,7 +53,7 @@ public:
     virtual int ChannelForCamID(int camID) = 0;
 
     // Write a video frame to a specific channel (Thread-Safe via atomics)
-    virtual bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey, uint8_t mediaType) = 0;
+    virtual bool WriteFrame(int channelIdx, const FrameMetadata& meta, const uint8_t* payload) = 0;
 
     // Get the raw pointer (mostly for debugging or manual inspection)
     virtual uint8_t* GetBuffer() const = 0;

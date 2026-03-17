@@ -8,6 +8,7 @@ type StreamPacket struct {
 	IsKeyFrame bool
 	Payload    []byte
 	MediaType  uint8  // 0 = Video, 1 = Audio
+	CodecID    uint32
 }
 
 // MediaType constants to match your C++ definitions
