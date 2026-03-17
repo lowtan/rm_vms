@@ -34,13 +34,7 @@ VideoIngestion::~VideoIngestion() {
     // Signal the thread to stop
     stopSignal = true;
 
-    // Wake up the disk writer thread and tell it to exit safely
-    diskWriterQueue.push(nullptr);
-
-    // Join the disk writer thread
-    if (diskWriterThread.joinable()) {
-        diskWriterThread.join();
-    }
+    stopAndJoinDiskWriterThread();
 
     // Wait for the thread to finish (Join)
     // If we don't join, the thread might try to access 'this' after the object is destroyed -> Crash.
@@ -49,7 +43,6 @@ VideoIngestion::~VideoIngestion() {
     }
 
 }
-
 
 /**
  * =========================================================
@@ -114,13 +107,28 @@ void VideoIngestion::findStreamIndices() {
     videoStreamIndex = -1;
     audioStreamIndex = -1;
 
-    for (unsigned int i = 0; i < fmtCtx->nb_streams; i++) {
-        if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            videoStreamIndex = i;
-        } else if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            audioStreamIndex = i;
-        }
+    // Parameters: Context, Media Type, Wanted Stream (-1 for auto), Related Stream (-1 for none), Decoder ptr, Flags
+    int vIdx = av_find_best_stream(fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    
+    if (vIdx >= 0) {
+        videoStreamIndex = vIdx;
+        // Log::info(camName + " Found Video Stream at index: " + std::to_string(videoStreamIndex));
     }
+
+    // We pass 'vIdx' as the related stream so FFmpeg tries to find an audio track explicitly mapped to our video
+    int aIdx = av_find_best_stream(fmtCtx, AVMEDIA_TYPE_AUDIO, -1, vIdx, nullptr, 0);
+    if (aIdx >= 0) {
+        audioStreamIndex = aIdx;
+        // Log::info(camName + " Found Audio Stream at index: " + std::to_string(audioStreamIndex));
+    }
+
+    // for (unsigned int i = 0; i < fmtCtx->nb_streams; i++) {
+    //     if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+    //         videoStreamIndex = i;
+    //     } else if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+    //         audioStreamIndex = i;
+    //     }
+    // }
 }
 
 void VideoIngestion::initDiskWriter() {
@@ -199,48 +207,60 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
     // Send raw packet to the filter
     if (av_bsf_send_packet(bsfCtx, packet) == 0) {
         
-        // Receive the modified packet(s) back
-        while (av_bsf_receive_packet(bsfCtx, packet) == 0) {
-            
-            bool isKey = (packet->flags & AV_PKT_FLAG_KEY);
+        // Allocate a temporary packet for the output
+        AVPacket* bsfPacket = av_packet_alloc();
+
+        // Receive the modified packet(s) into the NEW packet
+        while (av_bsf_receive_packet(bsfCtx, bsfPacket) == 0) {
+
+            bool isKey = (bsfPacket->flags & AV_PKT_FLAG_KEY);
 
             if (waitForKeyFrame) {
                 if (isKey) {
                     Log::info(camName + " [ingestVideo] First key frame found.");
                     waitForKeyFrame = false;
                 } else {
-                    av_packet_unref(packet); 
+                    av_packet_unref(bsfPacket); 
                     continue;
                 }
             }
 
             try {
-
-                if (shm->WriteFrame(shmChannelID, packet->data, packet->size, packet->pts, isKey) < 0) {
+                // Use bsfPacket here!
+                if (shm->WriteFrame(shmChannelID, bsfPacket->data, bsfPacket->size, bsfPacket->pts, isKey, 0) < 0) {
                     Log::error(camName + " [ingestVideo] Failed to write frame data.");
                 }
-                packetToDiskWriter(packet);
+                packetToDiskWriter(bsfPacket);
 
             } catch(...) {
                 Log::error(camName + " [ingestVideo] Caught exception writing frame data.");
             }
 
-            // Clean up the filtered packet
-            av_packet_unref(packet);
+            // Clean up the temporary packet for the next iteration of the while loop
+            av_packet_unref(bsfPacket);
         }
+        
+        // Free the temporary packet when the while loop is done
+        av_packet_free(&bsfPacket);
     }
 }
 
 void VideoIngestion::ingestAudio(AVPacket* packet) {
 
-    // TODO: Implement audio extraction and routing to Audio SHM Buffer
-
     // A/V Sync Gatekeeper: Drop audio until video has established a keyframe.
     // This prevents "black screen with audio" at the start of recordings/streams.
     if (waitForKeyFrame) {
-        // We haven't found a video I-Frame yet. Discard this audio packet.
-        av_packet_unref(packet);
         return;
+    }
+
+    // Audio frames do not have "Keyframes" in the same way video does, 
+    // so we pass 'false' for the isKey parameter.
+    try {
+        if (shm->WriteFrame(shmChannelID, packet->data, packet->size, packet->pts, false, 1) < 0) {
+            Log::error(camName + " [SHM] Failed to write audio frame.");
+        }
+    } catch(...) {
+        Log::error(camName + " [SHM] Caught exception writing audio frame.");
     }
 
     packetToDiskWriter(packet);
@@ -276,7 +296,31 @@ int VideoIngestion::openInput() {
 
 }
 
+/**
+ * =========================================================
+ * --- Private Method: stopAndJoinDiskWriterThread ---
+ * =========================================================
+ */
+void VideoIngestion::stopAndJoinDiskWriterThread() {
+
+    // Wake up the disk writer thread and tell it to exit safely
+    diskWriterQueue.push(nullptr);
+
+    // Join the disk writer thread
+    if (diskWriterThread.joinable()) {
+        diskWriterThread.join();
+    }
+}
+
+/**
+ * =========================================================
+ * --- Private Method: cleanup ---
+ * =========================================================
+ */
 int VideoIngestion::cleanup() {
+
+    stopAndJoinDiskWriterThread();
+
     // Free the Bitstream Filter (Fixes the memory leak!)
     if (bsfCtx) {
         av_bsf_free(&bsfCtx);

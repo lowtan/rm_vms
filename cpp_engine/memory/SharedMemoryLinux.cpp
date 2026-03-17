@@ -129,7 +129,7 @@ public:
     }
 
     // Returns false if buffer is full
-    bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey) override {
+    bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey, uint8_t mediaType) override {
         if (channelIdx < 0 || channelIdx >= _channels.size()) return false;
 
         ChannelCtx& ch = _channels[channelIdx];
@@ -173,6 +173,7 @@ public:
         meta.frameSize = static_cast<uint32_t>(size);
         meta.timestamp = timestamp;
         meta.isKeyFrame = isKey ? 1 : 0;
+        meta.mediaType = mediaType;
 
         uint8_t* writePtr = ch.dataStart + effectiveWriteStart;
         memcpy(writePtr, &meta, sizeof(FrameMetadata));

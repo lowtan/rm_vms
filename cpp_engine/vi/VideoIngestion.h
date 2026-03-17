@@ -51,6 +51,7 @@ private:
     int startIngestion();       // The main worker thread loop
     int openInput();            // Connects to the RTSP source
     int cleanup();              // Safely frees all FFmpeg resources
+    void stopAndJoinDiskWriterThread();
 
     // --- Setup Helpers ---
     void findStreamIndices();

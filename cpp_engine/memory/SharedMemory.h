@@ -15,7 +15,8 @@ struct FrameMetadata {
     uint32_t frameSize;    // Size of the actual video data
     uint64_t timestamp;    // Unix timestamp or PTS
     uint8_t  isKeyFrame;   // 1 = I-Frame, 0 = P/B-Frame
-    uint8_t  _padding[47]; // Pad to 64 bytes for alignment
+    uint8_t mediaType;
+    uint8_t  _padding[46]; // Pad to 64 bytes for alignment
 };
 
 struct RingBufferHeader {
@@ -46,7 +47,7 @@ public:
     virtual int ChannelForCamID(int camID) = 0;
 
     // Write a video frame to a specific channel (Thread-Safe via atomics)
-    virtual bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey) = 0;
+    virtual bool WriteFrame(int channelIdx, const uint8_t* data, size_t size, uint64_t timestamp, bool isKey, uint8_t mediaType) = 0;
 
     // Get the raw pointer (mostly for debugging or manual inspection)
     virtual uint8_t* GetBuffer() const = 0;
