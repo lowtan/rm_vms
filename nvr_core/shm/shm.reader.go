@@ -117,7 +117,7 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 
 		// Attempt to read a frame
 		// frameData, timestamp, ok := rb.ReadFrame()
-		frameData, _, isKey, ok := rb.ReadFrame()
+		frameData, _, isKey, mediaType, ok := rb.ReadFrame()
 
 		if !ok {
 			// Buffer is empty.
@@ -131,7 +131,7 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 		// frameData now holds the raw video bytes (e.g., H.264 NAL units).
 		// You can route this data to disk, a WebSocket, or a WebRTC pipeline.
 
-		f := stream.VideoFrame { IsKeyFrame: isKey, Payload: frameData }
+		f := stream.StreamPacket { IsKeyFrame: isKey, Payload: frameData, MediaType: mediaType }
 
 		bc.Broadcast <- f
 		// fileDumpTest(frameData, r.workerName, channelID)

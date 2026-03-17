@@ -88,12 +88,12 @@ func ConnectSharedMemory(name string, numChannels int, sizePerChannel int) (*Wor
 	return w, nil
 }
 
-func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
+func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, uint8, bool) {
 	head := atomic.LoadUint32(&rb.Header.WriteHead)
 	tail := atomic.LoadUint32(&rb.Header.ReadTail)
 
 	if tail == head {
-		return nil, 0, false, false // Buffer is empty
+		return nil, 0, false, 0, false // Buffer is empty
 	}
 
 	// Edge Case: Tail is so close to the end that even the 64-byte metadata won't fit.
@@ -121,7 +121,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
 		if magic != MagicNumber {
 			// Emergency Recovery: Catch up to the writer's head to drop corrupted state
 			atomic.StoreUint32(&rb.Header.ReadTail, head)
-			return nil, 0, false, false
+			return nil, 0, false, 0, false
 		}
 	}
 
@@ -130,6 +130,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
 	frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
 	timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
 	isKeyFrame := metaBytes[16] !=0 // Available if you need it later
+	mediaType := metaBytes[17]
 
 	start := tail + MetadataSize
 	end := start + frameSize
@@ -138,7 +139,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
 	// Even with the magic number, if memory corruption occurs, prevent a crash.
 	if end > rb.Capacity {
 		atomic.StoreUint32(&rb.Header.ReadTail, head) // Drop and recover
-		return nil, 0, false, false
+		return nil, 0, false, 0, false
 	}
 
 	// Copy Data safely
@@ -148,7 +149,7 @@ func (rb *RingBuffer) ReadFrame() ([]byte, uint64, bool, bool) {
 	// Commit Read
 	atomic.StoreUint32(&rb.Header.ReadTail, end)
 
-	return frameData, timestamp, isKeyFrame, true
+	return frameData, timestamp, isKeyFrame, mediaType, true
 }
 
 

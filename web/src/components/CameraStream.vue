@@ -53,7 +53,7 @@ const initPlayer = () => {
   //  Initialize JMuxer
   jmuxer = new JMuxer({
     node: 'player-' + props.camId,
-    mode: 'video',          // We only have video right now
+    mode: 'both',          // We only have video right now
     flushingTime: 0,        // 0 = ultra-low latency. Flushes frames instantly.
     clearBuffer: true,      // Keeps memory usage low over long periods
     fps: 30,                // Fallback FPS, though the H.264 stream usually dictates this
@@ -76,13 +76,38 @@ const initPlayer = () => {
   };
 
   ws.onmessage = (event) => {
-    //  Feed the binary frame directly to JMuxer
-    // Because your C++ worker injected the SPS/PPS, JMuxer instantly knows what to do!
-    if (jmuxer) {
+
+    // Wrap the incoming ArrayBuffer
+    const data = new Uint8Array(event.data);
+    
+    // Read the 1-byte header
+    const mediaType = data[0];
+    
+    // Extract the payload (everything after index 0)
+    const payload = data.subarray(1);
+
+    // Route to the correct JMuxer buffer
+    if (mediaType === 0) {
+      // Video Packet (H.264 Annex-B)
       jmuxer.feed({
-        video: new Uint8Array(event.data)
+        video: payload
       });
+    } else if (mediaType === 1) {
+      // Audio Packet (Typically AAC)
+      jmuxer.feed({
+        audio: payload
+      });
+    } else {
+      console.warn("Unknown media type received:", mediaType);
     }
+
+    // //  Feed the binary frame directly to JMuxer
+    // // Because C++ worker injected the SPS/PPS, JMuxer instantly knows what to do!
+    // if (jmuxer) {
+    //   jmuxer.feed({
+    //     video: new Uint8Array(event.data)
+    //   });
+    // }
   };
 
   ws.onclose = () => {
