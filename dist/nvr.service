@@ -1,0 +1,17 @@
+[Unit]
+Description=High-Performance Hybrid NVR Service
+After=network.target
+
+[Service]
+Type=simple
+# Run out of the secure opt directory
+WorkingDirectory=/opt/nvr/bin
+ExecStart=/opt/nvr/bin/nvr_service
+# Automatically restart if it crashes
+Restart=always
+RestartSec=5
+# Allow unrestricted access to /dev/shm for the ring buffer
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

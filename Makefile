@@ -4,6 +4,7 @@
 
 # Docker Build Name
 DOCKER_IMAGE_NAME = vmsnvr
+VERSION = 0.1
 
 # -- Output Binaries --
 # The C++ worker binary name (must match what main.go looks for)
@@ -60,6 +61,15 @@ clean:
 docker:
 	docker build --platform linux/amd64 -t $(DOCKER_IMAGE_NAME) .
 # 	docker build -t $(DOCKER_IMAGE_NAME) .
+
+dockersave:
+	docker save $(DOCKER_IMAGE_NAME):latest | gzip > ../nvr_image.$(VERSION).tar.gz
+
+export:
+	docker create --name nvr-extractor $(DOCKER_IMAGE_NAME)
+	docker cp nvr-extractor:/app/nvr_service ./dist/nvr_service
+	docker cp nvr-extractor:/app/nvr_worker ./dist/nvr_worker
+	docker rm nvr-extractor
 
 # Run the Docker container
 docker-run:
