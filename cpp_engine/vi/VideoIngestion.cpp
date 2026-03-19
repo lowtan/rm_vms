@@ -287,10 +287,10 @@ void VideoIngestion::ingestAudio(AVPacket* packet) {
     try {
         FrameMetadata meta = makeFrameMetadataA(packet);
         if (shm->WriteFrame(shmChannelID, meta, packet->data) < 0) {
-            Log::error(camName + " [SHM] Failed to write audio frame.");
+            Log::error(camName + " [SHM] Failed to write audio stream.");
         }
     } catch(...) {
-        Log::error(camName + " [SHM] Caught exception writing audio frame.");
+        Log::error(camName + " [SHM] Caught exception writing audio stream.");
     }
 
     packetToDiskWriter(packet);

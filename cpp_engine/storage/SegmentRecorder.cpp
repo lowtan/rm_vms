@@ -29,13 +29,26 @@ bool SegmentRecorder::StartSegment(const std::string& filename, AVStream* inVide
 
     // --- Setup Audio Stream ---
     if (inAudioStream) {
-        AVStream* outAStream = avformat_new_stream(outFormatCtx, nullptr);
-        avcodec_parameters_copy(outAStream->codecpar, inAudioStream->codecpar);
-        outAStream->codecpar->codec_tag = 0;
-        
-        outAudioStreamIndex = outAStream->index;
-        inAudioStreamIndex = inAudioStream->index;
-        audioInputTimeBase = inAudioStream->time_base;
+        if (avformat_query_codec(outFormatCtx->oformat, inAudioStream->codecpar->codec_id, FF_COMPLIANCE_NORMAL) == 1) {
+
+            AVStream* outAStream = avformat_new_stream(outFormatCtx, nullptr);
+            avcodec_parameters_copy(outAStream->codecpar, inAudioStream->codecpar);
+            outAStream->codecpar->codec_tag = 0;
+            
+            outAudioStreamIndex = outAStream->index;
+            inAudioStreamIndex = inAudioStream->index;
+            audioInputTimeBase = inAudioStream->time_base;
+
+        } else {
+
+            // The codec is illegal for MP4. Log it and gracefully ignore the audio stream.
+            inAudioStreamIndex = -1;
+
+            std::cerr << "[SegmentRecorder] Warning: Audio codec '" 
+                      << avcodec_get_name(inAudioStream->codecpar->codec_id) 
+                      << "' is not supported in MP4. Recording video only." << std::endl;
+
+        }
     }
 
     // --- Open File & Write Header ---

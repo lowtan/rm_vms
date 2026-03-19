@@ -28,8 +28,8 @@ void writerWorker(SafeQueue<AVPacket*>& queue, AVStream* inVideoStream, AVStream
         }
 
         auto now = std::chrono::steady_clock::now();
-        // bool timeToRotate = std::chrono::duration_cast<std::chrono::minutes>(now - lastSwitchTime).count() >= RECORDING_ROTATE_TIME;
-        bool timeToRotate = std::chrono::duration_cast<std::chrono::seconds>(now - lastSwitchTime).count() >= 30;
+        bool timeToRotate = std::chrono::duration_cast<std::chrono::minutes>(now - lastSwitchTime).count() >= RECORDING_ROTATE_TIME;
+        // bool timeToRotate = std::chrono::duration_cast<std::chrono::seconds>(now - lastSwitchTime).count() >= 30;
 
         // CRITICAL A/V FIX: Ensure we only rotate files on a VIDEO Keyframe.
         // Audio streams often mark every packet as a keyframe.
@@ -42,10 +42,10 @@ void writerWorker(SafeQueue<AVPacket*>& queue, AVStream* inVideoStream, AVStream
 
             // Generate the precise directory tree and filename (e.g., /recordings/cam01/2026/03/12/15-30-00.mp4)
             std::string newFile = pathGenerator.For(camID, packet); 
-            
+
             // Pass both streams to the SegmentRecorder so it can allocate the MP4 tracks
             recorder.StartSegment(newFile, inVideoStream, inAudioStream);
-            
+
             lastSwitchTime = now;
             isFirstSegment = false;
         }
