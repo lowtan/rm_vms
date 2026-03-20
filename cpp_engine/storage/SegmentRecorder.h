@@ -24,6 +24,22 @@ private:
     AVRational videoInputTimeBase;
     AVRational audioInputTimeBase;
 
+    // Time tracking state for sanitization
+    int64_t lastVideoDTS = AV_NOPTS_VALUE;
+    int64_t lastAudioDTS = AV_NOPTS_VALUE;
+
+    // Timeline Normalization Trackers
+    bool hasStartTime = false;
+    bool hasAudioStartTime = false;
+    int64_t startVideoTime = AV_NOPTS_VALUE;
+    int64_t startAudioTime = AV_NOPTS_VALUE;
+
+    // Adjusts packets to start at 0. Returns false if the packet should be dropped.
+    bool normalizeTimeline(AVPacket* packet); 
+
+    // Forces timestamps to be strictly increasing
+    void sanitizeTimestamps(AVPacket* packet, int64_t* lastDTS);
+
 public:
     SegmentRecorder() = default;
     ~SegmentRecorder();

@@ -42,7 +42,7 @@ std::string StorePath::For(int camID, AVPacket* packet) {
 
     //  Construct the final filename: HH-MM-SS.mp4
     std::ostringstream fileStream;
-    fileStream << folderPath << "/" << std::put_time(&bt, "%H-%M-%S") << ".mp4";
+    fileStream << folderPath << "/" << std::put_time(&bt, "%H-%M-%S") << ".mkv";
 
     return fileStream.str();
 }
