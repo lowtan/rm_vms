@@ -1,20 +1,22 @@
 package process
 
 import (
-	"bufio"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"nvr_core/shm"
-	"nvr_core/stream"
-	"nvr_core/utils"
-	"os"
-	"os/exec"
-	"strconv"
-	"sync"
-	"syscall"
-	"time"
+    "bufio"
+    "context"
+    "encoding/json"
+    "fmt"
+    "io"
+    "nvr_core/db/models"
+    "nvr_core/db/ingest"
+    "nvr_core/shm"
+    "nvr_core/stream"
+    "nvr_core/utils"
+    "os"
+    "os/exec"
+    "strconv"
+    "sync"
+    "syscall"
+    "time"
 )
 
 const LOGSEP = "==============================================\n"
@@ -25,6 +27,12 @@ type WorkerResponse struct {
     CamID     int    `json:"cam"`
     ChannelID int    `json:"channel"`
     Size      int    `json:"size"`
+
+    // the Segment Done event
+    StartTime int64  `json:"start_time,omitempty"`
+    EndTime   int64  `json:"end_time,omitempty"`
+    FilePath  string `json:"file_path,omitempty"`
+    SizeBytes int64  `json:"size_bytes,omitempty"`
 }
 
 // Worker represents a single C++ subprocess
@@ -41,15 +49,17 @@ type Worker struct {
     streamHubs map[int]*stream.Hub
     mu         sync.Mutex // Protects concurrent writes to Stdin
     dmu         utils.DebugMutex
+    ingester   *ingest.BatchIngester
 }
 
 // NewWorker creates a struct but doesn't start the process yet
-func NewWorker(id int, binaryPath string) *Worker {
+func NewWorker(id int, binaryPath string, ingester *ingest.BatchIngester) *Worker {
     return &Worker{
         ID:         id,
         BinaryPath: binaryPath,
         cameras: make(map[int]*Camera),
         streamHubs: make(map[int]*stream.Hub),
+        ingester: ingester,
     }
 }
 
@@ -102,6 +112,27 @@ func (w *Worker) updateCameraSHMChannel(resp WorkerResponse) {
     w.mu.Unlock()
 
 }
+
+func (w *Worker) handleSegmentDone(resp WorkerResponse) {
+    // --- DB HOOK ---
+    seg := &models.Segment{
+        CameraID:  strconv.Itoa(resp.CamID),
+        StartTime: resp.StartTime,
+        EndTime:   resp.EndTime,
+        FilePath:  resp.FilePath,
+        SizeBytes: resp.SizeBytes,
+    }
+    
+    // Push it to the non-blocking Go channel
+    // (Assuming you added `ingester *ingest.BatchIngester` to your Worker struct)
+    if w.ingester != nil {
+        w.ingester.Enqueue(seg)
+    } else {
+        fmt.Printf("\033[33m[Go][Worker %d] Warning: DB Ingester not configured, dropping segment metadata.\033[0m\n", w.ID)
+    }
+}
+
+// ==================================
 
 func (w *Worker) StreamHubForCam(camId int) *stream.Hub {
     cam := w.cameras[camId]
@@ -249,24 +280,28 @@ func (w *Worker) GetCameras() []*Camera {
  * ======================================================
  */
 
+// handleCMDResponse parses the action from the C++ worker and routes it.
 func (w *Worker) handleCMDResponse(resp WorkerResponse) {
-    // fmt.Printf("[Go][handleCMDResponse] Received Update -> Cam %d Status: %s\n", resp.CamID, resp.Status)
-    if(resp.Status == "stopped") {
-
+    switch resp.Status {
+    case "stopped":
         w.handleStoppedStream(resp)
-
-    } else if(resp.Status == "starting") {
-
+        
+    case "starting":
         w.updateCameraStatus(resp)
-
-    } else if(resp.Status == "streaming") {
-
+        
+    case "streaming":
         w.updateCameraSHMChannel(resp)
-
-    } else if(resp.Status == "shm") {
-
+        
+    case "shm":
         w.startSHMReader(resp)
+        
+    case "segment_done":
+        w.handleSegmentDone(resp)
 
+
+    default:
+        // Catch-all for unexpected IPC messages
+        fmt.Printf("\033[33m[Go][Worker %d] Received unknown status from C++: '%s'\033[0m\n", w.ID, resp.Status)
     }
 }
 

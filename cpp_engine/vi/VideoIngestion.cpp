@@ -170,7 +170,7 @@ void VideoIngestion::routePacket(AVPacket* packet) {
     if (packet->stream_index == videoStreamIndex) {
         ingestVideo(packet);
     } else if (packet->stream_index == audioStreamIndex) {
-        // ingestAudio(packet);
+        ingestAudio(packet);
     } 
     // If it's metadata or subtitles, we just do nothing.
     // The orchestrator loop will safely unref it.

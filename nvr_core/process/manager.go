@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"nvr_core/utils"
+	"nvr_core/db/ingest"
 )
 
 
@@ -16,21 +17,23 @@ type Manager struct {
 	workers    []*Worker
 	binaryPath string
 	camWorker  map[int]int
+	ingester   *ingest.BatchIngester
 }
 
 // NewManager initializes the pool (e.g., count=4)
-func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath string) *Manager {
+func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath string, ingester *ingest.BatchIngester) *Manager {
 	mgr := &Manager{
 		ctx: ctx,
 		cfg: cfg,
 		workers:    make([]*Worker, count),
 		binaryPath: binaryPath,
 		camWorker: make(map[int]int),
+		ingester:   ingester,
 	}
 
 	// Initialize workers
 	for i := 0; i < count; i++ {
-		mgr.workers[i] = NewWorker(i, binaryPath)
+		mgr.workers[i] = NewWorker(i, binaryPath, ingester)
 	}
 
 	return mgr

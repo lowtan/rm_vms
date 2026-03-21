@@ -2,8 +2,11 @@
 
 #include "SegmentRecorder.h"
 #include "StorePath.h"
+#include "Log.h"
+
 #include <chrono>
 #include <string>
+#include <filesystem>
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -11,12 +14,45 @@ extern "C" {
 
 const int RECORDING_ROTATE_TIME = 1; // By minute
 
+
+static inline long getCurrentUnixTime() {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+// --- IPC Helper Function ---
+static void sendSegmentDoneIPC(int camID, long startTimeUnix, const std::string& filePath) {
+    // If there is no file path (e.g., the very first startup iteration), do nothing.
+    if (filePath.empty()) return;
+
+    long endTimeUnix = getCurrentUnixTime();
+    
+    // Get exact bytes written to the physical disk
+    long sizeBytes = 0;
+    std::error_code ec;
+    sizeBytes = std::filesystem::file_size(filePath, ec);
+    if (ec) sizeBytes = 0; // Failsafe if the file didn't write correctly
+
+    // Construct and send JSON down the STDOUT pipe
+    std::string json = "{\"status\":\"segment_done\", "
+                       "\"cam\":" + std::to_string(camID) + ", "
+                       "\"start_time\":" + std::to_string(startTimeUnix) + ", "
+                       "\"end_time\":" + std::to_string(endTimeUnix) + ", "
+                       "\"file_path\":\"" + filePath + "\", "
+                       "\"size_bytes\":" + std::to_string(sizeBytes) + "}";
+    
+    Log::send(json);
+}
+
 void writerWorker(SafeQueue<AVPacket*>& queue, AVStream* inVideoStream, AVStream* inAudioStream, int camID) {
     SegmentRecorder recorder;
     StorePath pathGenerator; // Reads from default "/recordings" internally
     
     auto lastSwitchTime = std::chrono::steady_clock::now();
     bool isFirstSegment = true;
+
+    std::string currentFilePath;
+    long currentStartTimeUnix = 0;
 
     // The loop runs infinitely until the destructor pushes a nullptr
     while (true) {
@@ -40,11 +76,15 @@ void writerWorker(SafeQueue<AVPacket*>& queue, AVStream* inVideoStream, AVStream
         if (isFirstSegment || (timeToRotate && isVideoKeyframe)) {
             recorder.StopSegment();
 
+            // Fire the IPC event for the completed file (Safely ignores the first run)
+            sendSegmentDoneIPC(camID, currentStartTimeUnix, currentFilePath);
+
             // Generate the precise directory tree and filename (e.g., /recordings/cam01/2026/03/12/15-30-00.mp4)
-            std::string newFile = pathGenerator.For(camID, packet); 
+            currentFilePath = pathGenerator.For(camID, packet); 
+            currentStartTimeUnix = getCurrentUnixTime();
 
             // Pass both streams to the SegmentRecorder so it can allocate the MP4 tracks
-            recorder.StartSegment(newFile, inVideoStream, inAudioStream);
+            recorder.StartSegment(currentFilePath, inVideoStream, inAudioStream);
 
             lastSwitchTime = now;
             isFirstSegment = false;

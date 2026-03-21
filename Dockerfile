@@ -6,7 +6,7 @@
 # "--platform=$BUILDPLATFORM" is the magic fix.
 # It tells Docker: "Use the Go image that matches the computer I am building on (ARM64)"
 # This prevents QEMU crashes during 'go mod tidy'.
-FROM --platform=$BUILDPLATFORM golang:1.24 AS go-builder
+FROM --platform=$BUILDPLATFORM golang:1.25 AS go-builder
 
 # Pull in the target architecture from Docker buildx (e.g., linux and amd64)
 ARG TARGETOS

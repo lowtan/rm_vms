@@ -174,7 +174,7 @@ bool SegmentRecorder::normalizeTimeline(AVPacket* packet) {
             packet->dts -= startVideoTime;
             if (packet->dts < 0) packet->dts = 0;
         }
-        Log::info("[SegmentRecorder][normalizeTimeline]video dts " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
+        // Log::info("[SegmentRecorder][normalizeTimeline]video dts " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
     } else if (packet->stream_index == outAudioStreamIndex && hasAudioStartTime) {
         if (packet->pts != AV_NOPTS_VALUE) {
             packet->pts -= startAudioTime;
@@ -184,7 +184,7 @@ bool SegmentRecorder::normalizeTimeline(AVPacket* packet) {
             packet->dts -= startAudioTime;
             if (packet->dts < 0) packet->dts = 0;
         }
-        Log::info("[SegmentRecorder][normalizeTimeline]audio dts " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
+        // Log::info("[SegmentRecorder][normalizeTimeline]audio dts " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
     }
 
 
@@ -204,6 +204,6 @@ void SegmentRecorder::sanitizeTimestamps(AVPacket* packet, int64_t* lastDTS) {
     // Update the tracker for the next packet
     *lastDTS = packet->dts;
 
-    Log::info("[SegmentRecorder][sanitizeTimestamps] lastDTS " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
+    // Log::info("[SegmentRecorder][sanitizeTimestamps] lastDTS " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
 
 }
