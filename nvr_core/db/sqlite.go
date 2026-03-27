@@ -4,10 +4,29 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	// "log"
 	"time"
 
 	_ "modernc.org/sqlite" // Pure-Go SQLite driver
 )
+
+func InitiateDB(ctx context.Context, dsn string) (*sql.DB, error) {
+
+	dbConn, err := NewConnection("db/nvr_metadata.db")
+	if err != nil {
+		// log.Fatalf("Failed to open SQLite database: %v", err)
+		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
+	}
+
+	// Ensure tables are created
+	if err := RunMigrations(ctx, dbConn); err != nil {
+		// log.Fatalf()
+		return nil, fmt.Errorf("Failed to run DB migrations: %v", err)
+	}
+
+	return dbConn, nil
+
+}
 
 // NewConnection opens the DB and applies critical performance pragmas.
 func NewConnection(dsn string) (*sql.DB, error) {

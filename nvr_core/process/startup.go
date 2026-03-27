@@ -1,18 +1,19 @@
 package process
 
 import (
-	"log"
 	"context"
-	"nvr_core/utils"
-	"nvr_core/db"
+	"database/sql"
+	"log"
+	// "nvr_core/db"
 	"nvr_core/db/ingest"
+	"nvr_core/utils"
 )
 
 const CPP_WORKER_BIN = "./nvr_worker"
 
-func Startup(ctx context.Context, cfg *utils.Config) (*Manager) {
+func Startup(ctx context.Context, cfg *utils.Config, dbConn *sql.DB) (*Manager) {
 
-	ingester := startIngester(ctx)
+	ingester := startIngester(ctx, dbConn)
 
 	pm := NewManager(ctx, cfg, 4, CPP_WORKER_BIN, ingester)
 
@@ -33,18 +34,7 @@ func Startup(ctx context.Context, cfg *utils.Config) (*Manager) {
 
 }
 
-func startIngester(ctx context.Context) *ingest.BatchIngester {
-
-	// Initialize the SQLite Database
-	dbConn, err := db.NewConnection("db/nvr_metadata.db")
-	if err != nil {
-		log.Fatalf("Failed to open SQLite database: %v", err)
-	}
-
-	// Ensure tables are created
-	if err := db.RunMigrations(ctx, dbConn); err != nil {
-		log.Fatalf("Failed to run DB migrations: %v", err)
-	}
+func startIngester(ctx context.Context, dbConn *sql.DB) *ingest.BatchIngester {
 
 	// Initialize the Global BatchIngester
 	// Buffer 200 segments, flush to disk in batches of 50

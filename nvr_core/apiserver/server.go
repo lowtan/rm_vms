@@ -2,12 +2,14 @@ package apiserver
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	"nvr_core/db/repository"
 	"nvr_core/process"
 	"nvr_core/utils"
 )
@@ -28,7 +30,10 @@ type APIServer struct {
 	// SHub *stream.Hub
 }
 
-func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager) {
+func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, dbConn *sql.DB) {
+
+	segRepo := repository.NewSegmentRepository(dbConn)
+	dbH := NewDebugHandler(ctx, dbConn, segRepo)
 
 	log.Println("Initializing API server")
 
@@ -37,6 +42,8 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager) {
 	api := &APIServer{State: state, CFG: cfg, PM: pm}
 
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /debug/db", dbH.ServeHTTP)
 
 	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 
