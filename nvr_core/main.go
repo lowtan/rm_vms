@@ -28,7 +28,10 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	dbConn, err := db.InitiateDB(ctx, "db/nvr_metadata.db")
+	dbPath := cfg.Server.DBPath+"/nvr_metadata.db"
+
+	log.Println("Attempting to open DB at:", dbPath)
+	dbConn, err := db.InitiateDB(ctx, dbPath)
 
 	if err != nil {
 		log.Fatalf("Error Initiate database: %v", err)

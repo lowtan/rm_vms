@@ -12,7 +12,7 @@ import (
 
 func InitiateDB(ctx context.Context, dsn string) (*sql.DB, error) {
 
-	dbConn, err := NewConnection("db/nvr_metadata.db")
+	dbConn, err := NewConnection(dsn)
 	if err != nil {
 		// log.Fatalf("Failed to open SQLite database: %v", err)
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)

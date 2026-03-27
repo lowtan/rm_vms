@@ -39,6 +39,7 @@ func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
 		cams := worker.GetCameras()
 		log.Printf("[GetCameras] cams (%d)\n", len(cams))
 		for _, cam := range cams {
+			// cam.rtsp = ""
 			camList = append(camList, cam)
 		}
 
