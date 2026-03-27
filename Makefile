@@ -29,7 +29,11 @@ RM := rm -rf
 CP := cp
 
 # -- Targets --
-.PHONY: all clean build-cpp build-go docker-build docker-run
+.PHONY: all help clean build-cpp build-go docker-build docker-run export docker dockers
+
+# .DEFAULT_GOAL := help
+# help: ## Show this help message
+# 	@awk -F ':.*##' 'NF==2 {printf "%-20s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Default target: Build everything
 all: build-go build-cpp

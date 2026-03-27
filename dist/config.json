@@ -1,6 +1,7 @@
 {
   "server": {
     "port": 8080,
+    "db_path": "./db",
     "storage_path": "/recordings",
     "retention_days": 7
   },
