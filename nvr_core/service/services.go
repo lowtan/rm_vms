@@ -22,10 +22,12 @@ func NewServices(dbConn *sql.DB) *Services {
 	segRepo := repository.NewSegmentRepository(dbConn)
 	timelineSvc := NewTimelineService(segRepo)
 	playbackSvc := NewPlaybackService(segRepo)
+	systemSvc := NewSystemService(dbConn, segRepo)
 
 	return &Services{
 		Timeline: timelineSvc,
 		Playback: playbackSvc,
+		System: systemSvc,
 	}
 }
 

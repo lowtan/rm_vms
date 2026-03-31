@@ -5,11 +5,12 @@ import (
 	"database/sql"
 
 	"nvr_core/apiserver/dto"
+	"nvr_core/db/models"
 	"nvr_core/db/repository"
 )
 
 type SystemService interface {
-	GetDebugInfo(ctx context.Context) (dto.SystemDebugInfo, error)
+	GetDebugData(ctx context.Context) (dto.SystemDebugInfo, error)
 }
 
 
@@ -17,7 +18,7 @@ func NewSystemService(db *sql.DB, repo repository.SegmentRepository) SystemServi
 	return &debugServiceBase{db: db, repo: repo}
 }
 
-func (s *debugServiceBase) GetDebugInfo(ctx context.Context) (dto.SystemDebugInfo, error) {
+func (s *debugServiceBase) GetDebugData(ctx context.Context) (dto.SystemDebugInfo, error) {
 
 	// Query SQLite internal stats
 	var totalSegments int
@@ -35,7 +36,7 @@ func (s *debugServiceBase) GetDebugInfo(ctx context.Context) (dto.SystemDebugInf
 	}
 
 	if segment == nil {
-		return dto.SystemDebugInfo{}, nil
+		segment = &models.Segment{}
 	}
 
 	// Start the first block

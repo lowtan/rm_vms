@@ -13,9 +13,9 @@ import (
 func (api *APIServer) GetTimeline(w http.ResponseWriter, r *http.Request) {
 
 	// Parse Query Parameters
-	camIDStr := r.URL.Query().Get("cam_id")
-	startStr := r.URL.Query().Get("start")
-	endStr := r.URL.Query().Get("end")
+	camIDStr := r.PathValue("cam_id")
+	startStr := r.PathValue("start")
+	endStr := r.PathValue("end")
 
 	camID, err := strconv.Atoi(camIDStr)
 	start, err2 := strconv.ParseInt(startStr, 10, 64)

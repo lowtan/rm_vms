@@ -18,7 +18,7 @@ func NewSegmentItemFrom(segment *models.Segment) (SegmentItem) {
 		StartTime: segment.StartTime,
 		EndTime: segment.EndTime,
 		DurationMs: (segment.StartTime - segment.EndTime),
-		StreamURL: segment.FilePath,
+		// StreamURL: "segment.FilePath",
 	}
 
 
