@@ -9,9 +9,10 @@ import (
 // Services acts as a dependency injection container for the API layer.
 // The API layer knows NOTHING about SQLite or Repositories, only these interfaces.
 type Services struct {
-	Timeline TimelineService
+	Timeline   TimelineService
+	Playback   PlaybackService
 	// Camera   service.CameraService
-	System   SystemService
+	System     SystemService
 }
 
 
@@ -20,9 +21,11 @@ func NewServices(dbConn *sql.DB) *Services {
 
 	segRepo := repository.NewSegmentRepository(dbConn)
 	timelineSvc := NewTimelineService(segRepo)
+	playbackSvc := NewPlaybackService(segRepo)
 
 	return &Services{
 		Timeline: timelineSvc,
+		Playback: playbackSvc,
 	}
 }
 

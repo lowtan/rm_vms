@@ -14,12 +14,17 @@ import (
 
 // SegmentRepository defines the contract for segment data access.
 type SegmentRepository interface {
+
 	Insert(ctx context.Context, seg *models.Segment) error
+
+	// Maintenance
 	PruneOldest(ctx context.Context, limit int) ([]string, error)
 	IncrementalVacuum(ctx context.Context, pages int) error
+
+	// Segment search
 	GetLastSegment(ctx context.Context) (*models.Segment, error)
-	// Timeline search
 	GetSegmentsByRange(ctx context.Context, camID string, start, end int64) ([]*models.Segment, error)
+	GetSegmentAtTime(ctx context.Context, camID string, timestamp int64) (*models.Segment, error)
 
 	// Bulk Insert
 	BulkInsert(ctx context.Context, segments []*models.Segment) error

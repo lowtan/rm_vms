@@ -64,7 +64,8 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("POST /api/cameras", api.AddCamera)
 
 	// Timeline and Playback
-	mux.HandleFunc("POST /api/camera/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
+	mux.HandleFunc("POST /api/cameras/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
+	mux.HandleFunc("GET /api/cameras/{cam_id}/play", api.HandlePlayVideo)
 
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port);

@@ -12,24 +12,6 @@ import (
 func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
 	var camList []*process.Camera
 
-	// // Distribute Cameras
-	// for _, cam := range s.CFG.Cameras {
-	// 	if cam.Enabled {
-	// 		camList = append(camList, Camera{
-	// 			ID: cam.Name,
-	// 			RTSPUrl: cam.URL,
-	// 			Status: "",
-	// 		})
-	// 	}
-	// }
-
-	// s.State.Cameras.Range(func(key, value any) bool {
-	// 	if cam, ok := value.(Camera); ok {
-	// 		camList = append(camList, cam)
-	// 	}
-	// 	return true // continue iteration
-	// })
-
 	workers := s.PM.GetWorkers()
 
 	log.Printf("[GetCameras] workers(%d)\n", len(workers))
