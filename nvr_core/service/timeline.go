@@ -11,15 +11,11 @@ type TimelineService interface {
 	GetContiguousBlocks(ctx context.Context, camID string, start, end int64) ([]dto.TimelineBlock, error)
 }
 
-type timelineService struct {
-	repo repository.SegmentRepository
-}
-
 func NewTimelineService(repo repository.SegmentRepository) TimelineService {
-	return &timelineService{repo: repo}
+	return &segmentServiceBase{repo: repo}
 }
 
-func (s *timelineService) GetContiguousBlocks(ctx context.Context, camID string, start, end int64) ([]dto.TimelineBlock, error) {
+func (s *segmentServiceBase) GetContiguousBlocks(ctx context.Context, camID string, start, end int64) ([]dto.TimelineBlock, error) {
 	segments, err := s.repo.GetSegmentsByRange(ctx, camID, start, end)
 	if err != nil {
 		return nil, err

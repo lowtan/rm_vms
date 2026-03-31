@@ -11,8 +11,10 @@ import (
 type Services struct {
 	Timeline TimelineService
 	// Camera   service.CameraService
-	// System   SystemService // (This would replace your Debug logic)
+	System   SystemService
 }
+
+
 
 func NewServices(dbConn *sql.DB) *Services {
 

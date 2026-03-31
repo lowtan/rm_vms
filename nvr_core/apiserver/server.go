@@ -26,6 +26,7 @@ func NewNVRState() *NVRState {
 }
 
 type APIServer struct {
+	Context context.Context
 	CFG   *utils.Config
 	State *NVRState
 	PM    *process.Manager
@@ -41,18 +42,30 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 
 	state := NewNVRState()
 
-	api := &APIServer{State: state, CFG: cfg, PM: pm}
+	api := &APIServer{
+		Context: ctx,
+		State: state,
+		CFG: cfg,
+		PM: pm,
+		Services: svcs,
+	}
 
 	mux := http.NewServeMux()
 
-	// mux.HandleFunc("GET /debug/db", dbH.ServeHTTP)
+	// Debug Info
+	mux.HandleFunc("GET /debug/db", api.GetDebugInfo)
 
+	// Get camera stream
 	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 
 	mux.HandleFunc("GET /health", api.GetHealth)
 
 	mux.HandleFunc("GET /api/cameras", api.GetCameras)
 	mux.HandleFunc("POST /api/cameras", api.AddCamera)
+
+	// Timeline and Playback
+	mux.HandleFunc("POST /api/camera/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
+
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port);
 
