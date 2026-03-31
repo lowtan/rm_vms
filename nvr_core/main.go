@@ -8,7 +8,9 @@ import (
 	// Internal Packages
 	"nvr_core/apiserver"
 	"nvr_core/db"
+	// "nvr_core/db/repository"
 	"nvr_core/process"
+	"nvr_core/service"
 	"nvr_core/utils"
 )
 
@@ -42,9 +44,12 @@ func main() {
 	fmt.Printf("[Go Manager] Config Loaded. Storage: %s, Cameras: %d\n", 
 			cfg.Server.StoragePath, len(cfg.Cameras))
 
-	pm := process.Startup(ctx, cfg, dbConn)
+	servs := service.NewServices(dbConn)
+	ingester := service.StartIngester(ctx, dbConn)
 
-	go apiserver.Initiate(ctx, cfg, pm, dbConn)
+	pm := process.Startup(ctx, cfg, ingester)
+
+	go apiserver.Initiate(ctx, cfg, pm, servs)
 
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()

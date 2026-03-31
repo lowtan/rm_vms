@@ -1,22 +1,22 @@
 package process
 
 import (
-    "bufio"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "nvr_core/db/models"
-    "nvr_core/db/ingest"
-    "nvr_core/shm"
-    "nvr_core/stream"
-    "nvr_core/utils"
-    "os"
-    "os/exec"
-    "strconv"
-    "sync"
-    "syscall"
-    "time"
+	"bufio"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"nvr_core/db/models"
+	"nvr_core/service"
+	"nvr_core/shm"
+	"nvr_core/stream"
+	"nvr_core/utils"
+	"os"
+	"os/exec"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
 )
 
 const LOGSEP = "==============================================\n"
@@ -48,12 +48,12 @@ type Worker struct {
     shmReader  *shm.ReaderSHM
     streamHubs map[int]*stream.Hub
     mu         sync.Mutex // Protects concurrent writes to Stdin
-    dmu         utils.DebugMutex
-    ingester   *ingest.BatchIngester
+    dmu        utils.DebugMutex
+    ingester   service.IngestService
 }
 
 // NewWorker creates a struct but doesn't start the process yet
-func NewWorker(id int, binaryPath string, ingester *ingest.BatchIngester) *Worker {
+func NewWorker(id int, binaryPath string, ingester service.IngestService) *Worker {
     return &Worker{
         ID:         id,
         BinaryPath: binaryPath,

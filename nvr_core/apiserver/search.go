@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"nvr_core/db/repository"
 	"strconv"
 )
 
@@ -28,6 +29,9 @@ type SearchResponse struct {
 }
 
 // --- The Handler ---
+func NewSearchRecordHandler(segment repository.SegmentRepository) *DebugHandler {
+	return &DebugHandler{segment: segment}
+}
 
 // SearchRecords queries the SQLite database for video segments within a time range
 func (api *APIServer) SearchRecords(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +52,9 @@ func (api *APIServer) SearchRecords(w http.ResponseWriter, r *http.Request) {
 	// TODO: Query your SQLite database here using camID, start, and end.
 	// Example mock data representing rows returned from SQLite:
 	// rows, _ := db.Query("SELECT id, start_time, end_time FROM segments WHERE...")
-	
+
+	// api.
+
 	hostAddr := r.Host // Dynamically grab the server IP/Port
 	
 	response := SearchResponse{

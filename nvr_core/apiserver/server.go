@@ -2,17 +2,19 @@ package apiserver
 
 import (
 	"context"
-	"database/sql"
+	// "database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
-	"nvr_core/db/repository"
+	// "nvr_core/db/repository"
 	"nvr_core/process"
 	"nvr_core/utils"
+	"nvr_core/service"
 )
+
 
 // NVRState uses sync.Map for highly concurrent, lock-free (mostly) reads/writes
 type NVRState struct {
@@ -27,13 +29,13 @@ type APIServer struct {
 	CFG   *utils.Config
 	State *NVRState
 	PM    *process.Manager
-	// SHub *stream.Hub
+	Services *service.Services
 }
 
-func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, dbConn *sql.DB) {
+func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs *service.Services) {
 
-	segRepo := repository.NewSegmentRepository(dbConn)
-	dbH := NewDebugHandler(ctx, dbConn, segRepo)
+	// segRepo := repository.NewSegmentRepository(dbConn)
+	// dbH := NewDebugHandler(ctx, dbConn, segRepo)
 
 	log.Println("Initializing API server")
 
@@ -43,7 +45,7 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, dbCon
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /debug/db", dbH.ServeHTTP)
+	// mux.HandleFunc("GET /debug/db", dbH.ServeHTTP)
 
 	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 
