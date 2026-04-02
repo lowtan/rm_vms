@@ -11,6 +11,7 @@ import (
 type Services struct {
 	Timeline   TimelineService
 	Playback   PlaybackService
+	Playlist   PlaylistService
 	// Camera   service.CameraService
 	System     SystemService
 }
@@ -22,11 +23,13 @@ func NewServices(dbConn *sql.DB) *Services {
 	segRepo := repository.NewSegmentRepository(dbConn)
 	timelineSvc := NewTimelineService(segRepo)
 	playbackSvc := NewPlaybackService(segRepo)
+	playlistSvc := NewPlaylistService(segRepo)
 	systemSvc := NewSystemService(dbConn, segRepo)
 
 	return &Services{
 		Timeline: timelineSvc,
 		Playback: playbackSvc,
+		Playlist: playlistSvc,
 		System: systemSvc,
 	}
 }

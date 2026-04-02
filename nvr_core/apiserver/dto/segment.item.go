@@ -1,6 +1,9 @@
 package dto
 
-import "nvr_core/db/models"
+import (
+	"nvr_core/utils"
+	"nvr_core/db/models"
+)
 
 type SegmentItem struct {
 	ID         int    `json:"id"`
@@ -17,9 +20,8 @@ func NewSegmentItemFrom(segment *models.Segment) (SegmentItem) {
 		CameraID: segment.CameraID,
 		StartTime: segment.StartTime,
 		EndTime: segment.EndTime,
-		DurationMs: (segment.StartTime - segment.EndTime),
-		// StreamURL: "segment.FilePath",
+		DurationMs: (segment.EndTime - segment.StartTime),
+		StreamURL: utils.PathForCameraPlayURL(segment.CameraID, segment.StartTime),
 	}
-
 
 }
