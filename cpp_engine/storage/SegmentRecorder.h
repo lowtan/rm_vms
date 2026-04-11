@@ -28,6 +28,10 @@ private:
     int64_t lastVideoDTS = AV_NOPTS_VALUE;
     int64_t lastAudioDTS = AV_NOPTS_VALUE;
 
+    // For tracking actual segment duration
+    int64_t firstVideoPTS = AV_NOPTS_VALUE;
+    int64_t lastVideoPTS = AV_NOPTS_VALUE;
+
     // Timeline Normalization Trackers
     bool hasStartTime = false;
     bool hasAudioStartTime = false;
@@ -46,9 +50,10 @@ public:
 
     // Now accepts both streams. Audio can be nullptr if the camera doesn't have a mic.
     bool StartSegment(const std::string& filename, AVStream* inVideoStream, AVStream* inAudioStream);
+    void StopSegment();
 
     void WritePacket(AVPacket* packet);
-    void StopSegment();
+    double GetVideoDurationSeconds() const;
 
     inline bool IsRecording() const { return isRecording; }
 };

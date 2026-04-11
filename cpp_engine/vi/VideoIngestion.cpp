@@ -10,11 +10,12 @@ extern "C" {
 }
 
 // --- Constructor ---
-VideoIngestion::VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u)
+VideoIngestion::VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u, const std::string rp)
     : shm(mm), camID(id), url(u)
 {
     camName = "[Cam" + std::to_string(camID) + "]";
     shmChannelID = shm->ChannelForCamID(camID);
+    recorderWorker = std::make_unique<RecorderWorker>(rp);
 
     if(shmChannelID < 0) {
 
@@ -109,7 +110,7 @@ void VideoIngestion::findStreamIndices() {
 
     // Parameters: Context, Media Type, Wanted Stream (-1 for auto), Related Stream (-1 for none), Decoder ptr, Flags
     int vIdx = av_find_best_stream(fmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    
+
     if (vIdx >= 0) {
         videoStreamIndex = vIdx;
         videoCodecID = fmtCtx->streams[vIdx]->codecpar->codec_id;
@@ -138,16 +139,16 @@ void VideoIngestion::initDiskWriter() {
     diskWriterThread = std::thread([this]() {
         AVStream* vStream = (videoStreamIndex != -1) ? fmtCtx->streams[videoStreamIndex] : nullptr;
         AVStream* aStream = (audioStreamIndex != -1) ? fmtCtx->streams[audioStreamIndex] : nullptr;
-        
+
         // Pass both streams to the worker
-        writerWorker(this->diskWriterQueue, vStream, aStream, this->camID);
+        this->recorderWorker->writerWorker(this->diskWriterQueue, vStream, aStream, this->camID);
     });
 
 }
 
 int VideoIngestion::initVideoFilter() {
     const AVBitStreamFilter *bsf = av_bsf_get_by_name("dump_extra");
-    
+
     if (av_bsf_alloc(bsf, &bsfCtx) < 0) {
         Log::error(camName + " Failed to allocate dump_extra BSF.");
         return -1;
@@ -232,7 +233,7 @@ FrameMetadata VideoIngestion::makeFrameMetadataA(AVPacket* packet) {
 void VideoIngestion::ingestVideo(AVPacket* packet) {
     // Send raw packet to the filter
     if (av_bsf_send_packet(bsfCtx, packet) == 0) {
-        
+
         // Allocate a temporary packet for the output
         AVPacket* bsfPacket = av_packet_alloc();
 
@@ -268,7 +269,7 @@ void VideoIngestion::ingestVideo(AVPacket* packet) {
             // Clean up the temporary packet for the next iteration of the while loop
             av_packet_unref(bsfPacket);
         }
-        
+
         // Free the temporary packet when the while loop is done
         av_packet_free(&bsfPacket);
     }
@@ -311,7 +312,7 @@ int VideoIngestion::openInput() {
     if (ret != 0) {
         // Create a buffer for the error message
         char errbuf[256];
-        
+
         // Ask FFmpeg to translate the error code
         av_strerror(ret, errbuf, sizeof(errbuf));
 

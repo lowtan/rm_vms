@@ -37,19 +37,20 @@ type WorkerResponse struct {
 
 // Worker represents a single C++ subprocess
 type Worker struct {
-    ID         int
-    BinaryPath string
-    Cmd        *exec.Cmd
-    Stdin      io.WriteCloser
-    Stdout     io.ReadCloser
-    Stderr     io.ReadCloser
-    cameras    map[int]*Camera
+    ID           int
+    BinaryPath   string
+    Cmd          *exec.Cmd
+    Stdin        io.WriteCloser
+    Stdout       io.ReadCloser
+    Stderr       io.ReadCloser
+    storagePath  string
+    cameras      map[int]*Camera
     // SHM reader and stream hub
-    shmReader  *shm.ReaderSHM
-    streamHubs map[int]*stream.Hub
-    mu         sync.Mutex // Protects concurrent writes to Stdin
-    dmu        utils.DebugMutex
-    ingester   service.IngestService
+    shmReader    *shm.ReaderSHM
+    streamHubs   map[int]*stream.Hub
+    mu           sync.Mutex // Protects concurrent writes to Stdin
+    dmu          utils.DebugMutex
+    ingester     service.IngestService
 }
 
 // NewWorker creates a struct but doesn't start the process yet
@@ -122,7 +123,7 @@ func (w *Worker) handleSegmentDone(resp WorkerResponse) {
         FilePath:  resp.FilePath,
         SizeBytes: resp.SizeBytes,
     }
-    
+
     // Push it to the non-blocking Go channel
     // (Assuming you added `ingester *ingest.BatchIngester` to your Worker struct)
     if w.ingester != nil {
@@ -151,12 +152,20 @@ func (w *Worker) startSHMReader(resp WorkerResponse) {
 
 }
 
+func (w *Worker) SetStoragePath(s string) {
+    w.storagePath = s
+}
+
+// func (w *Worker) commandString() string {
+//     return fmt.Sprintf("%s %s", w.BinaryPath, w.storagePath)
+// }
+
 // Start launches the C++ binary and sets up pipes
 // This code will setup pipes and send WorkerID to
 // cpp program, and should not be called twice.
 func (w *Worker) Start(ctx context.Context) error {
 
-    w.Cmd = exec.CommandContext(ctx, w.BinaryPath)
+    w.Cmd = exec.CommandContext(ctx, w.BinaryPath, w.storagePath)
 
     // Configure Graceful Termination (Crucial for /dev/shm cleanup)
     // By default, CommandContext sends a brutal SIGKILL when the context cancels.
@@ -165,7 +174,7 @@ func (w *Worker) Start(ctx context.Context) error {
         // log.Printf("[Worker %s] Sending SIGTERM for graceful shutdown...", workerID)
         return w.Cmd.Process.Signal(syscall.SIGTERM)
     }
-    
+
     // Give the C++ worker 3 seconds to unmap memory and exit smoothly. 
     // If it hangs, Go will follow up with a SIGKILL to forcefully terminate it.
     w.Cmd.WaitDelay = 3 * time.Second
@@ -285,16 +294,16 @@ func (w *Worker) handleCMDResponse(resp WorkerResponse) {
     switch resp.Status {
     case "stopped":
         w.handleStoppedStream(resp)
-        
+
     case "starting":
         w.updateCameraStatus(resp)
-        
+
     case "streaming":
         w.updateCameraSHMChannel(resp)
-        
+
     case "shm":
         w.startSHMReader(resp)
-        
+
     case "segment_done":
         w.handleSegmentDone(resp)
 
@@ -390,7 +399,7 @@ func (w *Worker) monitorProcess(ctx context.Context) {
 // recoverWorker attempts to restart the C++ binary and restore its previous state
 func (w *Worker) recoverWorker(ctx context.Context) {
     fmt.Printf("[Go][Worker %d] Attempting to restart in 3 seconds...\n", w.ID)
-    
+
     // Add a small backoff delay. If the C++ worker is crashing instantly on startup
     // (e.g., due to a bad config), this prevents an infinite CPU-burning crash loop.
     time.Sleep(3 * time.Second)

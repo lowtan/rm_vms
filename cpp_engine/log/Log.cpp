@@ -33,6 +33,7 @@ void Log::error(const std::string& msg) {
     std::cerr << "[cpp_engine][err] " << msg << std::endl;
 }
 
+// This method does not work, since Go won't print as is.
 void Log::progress(const std::string& msg) {
     std::lock_guard<std::mutex> lock(s_Mutex);
 

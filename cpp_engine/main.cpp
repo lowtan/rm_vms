@@ -13,10 +13,17 @@
 const std::shared_ptr<ISharedMemory> SHM = ISharedMemory::CreateInstance();
 
 
-int main() {
+int main(int argc, char* argv[]) {
     // Optimize I/O
     std::ios_base::sync_with_stdio(false);
     std::cin.tie(NULL);
+
+    // Capture the root path from the first command line argument
+    std::string rootPath = "";
+    if (argc > 1) {
+        rootPath = argv[1];
+        Log::info("Worker started with root storage path: " + rootPath);
+    }
 
     // 
     std::map<int, std::unique_ptr<VideoIngestion>> activeCameras;
@@ -65,7 +72,7 @@ int main() {
 
                     // Run logic
                     int camID = std::stoi(idStr);
-                    activeCameras[camID] = std::make_unique<VideoIngestion>(SHM, camID, url);
+                    activeCameras[camID] = std::make_unique<VideoIngestion>(SHM, camID, url, rootPath);
 
                 } catch (...) {
                     Log::error("Error starting video ingestion.");

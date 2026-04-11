@@ -25,7 +25,7 @@ AVDictionary* configureAVDictionary(AVDictionary* options) {
     // (during avformat_open_input). Also in microseconds.
     av_dict_set(&options, "rw_timeout", "5000000", 0);
 
-        // 4. Minimize Latency
+    // Minimize Latency
     // Increase the Kernel Socket Buffer.
     // 64 cameras x 8Mbps = Huge throughput.
     // If the buffer is too small, the OS drops packets before your app sees them.

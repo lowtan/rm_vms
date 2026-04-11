@@ -20,11 +20,12 @@ struct AVPacket;
 class VideoIngestion
 {
 public:
-    VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u);
+    VideoIngestion(std::shared_ptr<ISharedMemory> mm, int id, const std::string u, const std::string rp);
     ~VideoIngestion();
 
 private:
 
+    std::unique_ptr<RecorderWorker> recorderWorker;
     std::shared_ptr<ISharedMemory> shm;
 
     int camID;

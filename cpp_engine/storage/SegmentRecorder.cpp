@@ -17,6 +17,9 @@ bool SegmentRecorder::StartSegment(const std::string& filename, AVStream* inVide
     lastVideoDTS = AV_NOPTS_VALUE;
     lastAudioDTS = AV_NOPTS_VALUE;
 
+    firstVideoPTS = AV_NOPTS_VALUE;
+    lastVideoPTS = AV_NOPTS_VALUE;
+
     // Reset Timeline Normalization trackers
     hasStartTime = false;
     hasAudioStartTime = false;
@@ -124,6 +127,13 @@ void SegmentRecorder::WritePacket(AVPacket* packet) {
     // ==========================================================
     sanitizeTimestamps(packet, lastDTS);
 
+    if (packet->stream_index == outVideoStreamIndex) {
+        if (firstVideoPTS == AV_NOPTS_VALUE) {
+            firstVideoPTS = packet->pts;
+        }
+        lastVideoPTS = packet->pts;
+    }
+
     // Interleave and write (FFmpeg handles the internal buffering to keep A/V in sync)
     if (av_interleaved_write_frame(outFormatCtx, packet) < 0) {
         Log::error("Error writing interleaved packet to file.");
@@ -206,4 +216,14 @@ void SegmentRecorder::sanitizeTimestamps(AVPacket* packet, int64_t* lastDTS) {
 
     // Log::info("[SegmentRecorder][sanitizeTimestamps] lastDTS " + std::to_string(packet->dts) + " : " + std::to_string(packet->pts));
 
+}
+
+double SegmentRecorder::GetVideoDurationSeconds() const {
+    if (firstVideoPTS == AV_NOPTS_VALUE || lastVideoPTS == AV_NOPTS_VALUE || !outFormatCtx) {
+        return 0.0;
+    }
+    AVStream* outStream = outFormatCtx->streams[outVideoStreamIndex];
+    int64_t duration = lastVideoPTS - firstVideoPTS;
+    // Convert FFmpeg timebase to real seconds
+    return duration * av_q2d(outStream->time_base);
 }
