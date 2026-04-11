@@ -57,6 +57,7 @@ FROM --platform=$TARGETPLATFORM ubuntu:22.04
 
 # Install runtime libs
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    ffmpeg \
     libavformat58 \
     libavcodec58 \
     libavutil56 \

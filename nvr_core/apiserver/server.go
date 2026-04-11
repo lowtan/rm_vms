@@ -66,9 +66,11 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	// Timeline and Playback
 	mux.HandleFunc("GET /api/cameras/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/play", api.HandlePlayVideo)
+	mux.HandleFunc("GET /api/cameras/{cam_id}/play/ts", api.HandleTransmuxTS)
 
-	// Add the new route to your ServeMux
+	// Playlist
 	mux.HandleFunc("GET /api/cameras/{cam_id}/playlist.m3u8", api.HandleGetPlaylist)
+	mux.HandleFunc("GET /api/cameras/{cam_id}/playlist/ts.m3u8", api.HandleGetTSPlaylist)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port);
 

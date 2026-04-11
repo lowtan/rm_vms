@@ -10,8 +10,8 @@ import (
 )
 
 
-// HandleGetPlaylist expects: GET /api/cameras/{cam_id}/playlist.m3u8?start=1711000000&end=1711003600
-func (api *APIServer) HandleGetPlaylist(w http.ResponseWriter, r *http.Request) {
+// HandleGetPlaylist expects: GET /api/cameras/{cam_id}/playlist/ts.m3u8?start=1711000000&end=1711003600
+func (api *APIServer) HandleGetTSPlaylist(w http.ResponseWriter, r *http.Request) {
 	camID := r.PathValue("cam_id")
 
 	// Parse timestamps
@@ -34,7 +34,7 @@ func (api *APIServer) HandleGetPlaylist(w http.ResponseWriter, r *http.Request) 
 	baseURL := fmt.Sprintf("%s://%s", scheme, r.Host)
 
 	// Call the Service
-	playlist, err := api.Services.Playlist.GeneratePlaylist(r.Context(), camID, start, end, baseURL)
+	playlist, err := api.Services.Playlist.GenerateVODPlaylist(r.Context(), camID, start, end, baseURL)
 
 	if err != nil {
 		if errors.Is(err, service.ErrVideoNotFound) {
@@ -46,9 +46,8 @@ func (api *APIServer) HandleGetPlaylist(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Crucial: Set the Apple HTTP Live Streaming MIME type
-	// w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-	w.Header().Set("Content-Type", "audio/x-mpegurl")
-	
+	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+
 	// Prevent caching so the browser/VLC always asks for fresh playlists
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
