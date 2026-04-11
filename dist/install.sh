@@ -17,7 +17,7 @@ fi
 
 echo "📦 Step 2: Installing FFmpeg runtime dependencies..."
 apt-get update
-apt-get install -y libavformat58 libavcodec58 libavutil56 libswscale5 ca-certificates
+apt-get install -y ffmpeg libavformat58 libavcodec58 libavutil56 libswscale5 ca-certificates
 
 echo "📂 Step 3: Creating secure system directories..."
 mkdir -p /opt/nvr/bin
