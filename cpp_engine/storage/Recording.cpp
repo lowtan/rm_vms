@@ -1,6 +1,5 @@
 #include "Recording.h"
 
-#include "SegmentRecorder.h"
 #include "StorePath.h"
 #include "Log.h"
 
