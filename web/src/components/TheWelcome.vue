@@ -7,6 +7,14 @@ import CommunityIcon from './icons/IconCommunity.vue'
 import SupportIcon from './icons/IconSupport.vue'
 
 const openReadmeInEditor = () => fetch('/__open-in-editor?file=README.md')
+
+import API from '@/api'
+
+API.timeline(1, 1775031969, 1775066221)
+.then(response=>{
+  console.log("[timeline]", response)
+})
+
 </script>
 
 <template>

@@ -1,0 +1,111 @@
+<template>
+  <div ref="timelineContainer" class="nvr-timeline-container"></div>
+</template>
+
+<script setup>
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { Timeline } from 'vis-timeline/standalone';
+import { DataSet } from 'vis-data';
+
+// Define the props we expect from the parent
+const props = defineProps({
+  items: {
+    type: Array,
+    required: true,
+    default: () => []
+  },
+  groups: {
+    type: Array,
+    required: false,
+    default: () => []
+  },
+  options: {
+    type: Object,
+    required: false,
+    default: () => ({})
+  }
+});
+
+// Define the events we want to pass up to the parent Vue component
+const emit = defineEmits(['select', 'timechange', 'timechanged']);
+
+const timelineContainer = ref(null);
+let timelineInstance = null;
+let itemsDataset = null;
+let groupsDataset = null;
+
+onMounted(() => {
+  // Convert static arrays to vis-data DataSets for optimized rendering
+  itemsDataset = new DataSet(props.items);
+  if (props.groups.length > 0) {
+    groupsDataset = new DataSet(props.groups);
+  }
+
+  // Initialize the timeline
+  timelineInstance = new Timeline(
+    timelineContainer.value,
+    itemsDataset,
+    groupsDataset,
+    props.options
+  );
+
+  // Bind vis-timeline events to Vue emits
+  timelineInstance.on('select', (properties) => emit('select', properties));
+  
+  // 'timechange' fires repeatedly while dragging the custom time bar (scrubbing)
+  timelineInstance.on('timechange', (properties) => emit('timechange', properties));
+  
+  // 'timechanged' fires once when dragging stops
+  timelineInstance.on('timechanged', (properties) => emit('timechanged', properties));
+});
+
+// Watch for changes in the parent's data and update the datasets efficiently
+watch(() => props.items, (newItems) => {
+  if (itemsDataset) {
+    itemsDataset.clear();
+    itemsDataset.add(newItems);
+  }
+}, { deep: true });
+
+watch(() => props.groups, (newGroups) => {
+  if (groupsDataset) {
+    groupsDataset.clear();
+    groupsDataset.add(newGroups);
+  }
+}, { deep: true });
+
+watch(() => props.options, (newOptions) => {
+  if (timelineInstance) {
+    timelineInstance.setOptions(newOptions);
+  }
+}, { deep: true });
+
+// CRITICAL: Clean up the instance when the component is unmounted
+onBeforeUnmount(() => {
+  if (timelineInstance) {
+    timelineInstance.destroy();
+    timelineInstance = null;
+  }
+});
+</script>
+
+<style>
+.nvr-timeline-container {
+  width: 100%;
+  /* Optional: Set a min-height so it doesn't collapse before data loads */
+  min-height: 150px; 
+}
+
+/* You can override default vis-timeline CSS variables here */
+:deep(.vis-timeline) {
+  border: 1px solid #444;
+  background-color: #1e1e1e;
+  color: white;
+}
+:deep(.vis-text) {
+  color: #EEE;
+}
+.vis-text {
+    color: #EEEEEE;
+}
+</style>

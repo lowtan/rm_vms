@@ -22,7 +22,7 @@ import JMuxer from 'jmuxer';
 
 const props = defineProps({
   camId: {
-    type: Number,
+    type: String,
     required: true
   },
   wsHost: {
@@ -77,14 +77,15 @@ const initPlayer = () => {
 
   ws.onmessage = (event) => {
 
+    const headerView = new Uint8Array(event.data, 0, 1);
+    const mediaType = headerView[0];
+
     // Wrap the incoming ArrayBuffer
-    const data = new Uint8Array(event.data);
-    
-    // Read the 1-byte header
-    const mediaType = data[0];
-    
+    const payloadBuffer = event.data.slice(1);
+    const payload = new Uint8Array(payloadBuffer);
+
     // Extract the payload (everything after index 0)
-    const payload = data.subarray(1);
+    // const payload = data.subarray(1);
 
     // Route to the correct JMuxer buffer
     if (mediaType === 0) {
