@@ -7,6 +7,7 @@ import (
 
 	// Internal Packages
 	"nvr_core/apiserver"
+	"nvr_core/webserver"
 	"nvr_core/db"
 	// "nvr_core/db/repository"
 	"nvr_core/process"
@@ -50,6 +51,8 @@ func main() {
 	pm := process.Startup(ctx, cfg, ingester)
 
 	go apiserver.Initiate(ctx, cfg, pm, servs)
+
+	go webserver.ServeWeb(cfg.Server.WebPort)
 
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()

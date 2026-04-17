@@ -16,6 +16,7 @@ type Config struct {
 
 type ServerConfig struct {
 	Port          int    `json:"port"`
+	WebPort       int    `json:"webPort"`
 	DBPath   string `json:"db_path"`
 	StoragePath   string `json:"storage_path"`
 	RetentionDays int    `json:"retention_days"`

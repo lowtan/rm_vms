@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	// "nvr_core/db/repository"
+	"nvr_core/apiserver/middleware"
 	"nvr_core/process"
 	"nvr_core/utils"
 	"nvr_core/service"
@@ -74,15 +74,16 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port);
 
+	handlerWithCORS := middleware.CORSMiddleware(mux)
+
 	// Production-grade server configuration
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      handlerWithCORS,
 		ReadTimeout:  5 * time.Second,  // Max time to read request headers/body
 		WriteTimeout: 10 * time.Second, // Max time to write response
 		IdleTimeout:  120 * time.Second, // Max time for keep-alive connections
 	}
-
 
 	// Start the server in a background goroutine
 	go func() {
