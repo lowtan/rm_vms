@@ -28,6 +28,7 @@ mkdir -p /etc/nvr
 echo "⚙️ Step 4: Installing binaries and configuration..."
 cp nvr_service /opt/nvr/bin/
 cp nvr_worker /opt/nvr/bin/
+cp -r web /opt/nvr/bin/web
 # Assumes config.json is bundled in your tarball next to the installer
 cp config.json /etc/nvr/config.json
 
@@ -38,7 +39,7 @@ chown -R nvr:nvr /etc/nvr
 
 # Set strict directory permissions (Owner: Read/Write/Execute, Group: Read/Execute, Other: None)
 chmod 750 /opt/nvr/bin
-chmod 750 /opt/nvr/recordings
+chmod 755 /opt/nvr/recordings
 chmod 750 /opt/nvr/db
 chmod 750 /etc/nvr
 

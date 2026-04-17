@@ -16,6 +16,7 @@ SERVICE_BIN_NAME := nvr_service
 GO_DIR := nvr_core
 CPP_ENGINE_DIR := cpp_engine
 CPP_ENGINE_BUILD_DIR := $(CPP_ENGINE_DIR)/build
+VUE_DIR := web
 
 # -- Build Flags --
 # -s disables symbol table, -w disables DWARF generation. Shrinks binary by ~25%
@@ -65,6 +66,9 @@ clean:
 	$(RM) $(SERVICE_BIN_NAME)
 	@echo "✔ Clean complete"
 
+vue:
+	cd $(VUE_DIR) && npm run build
+
 # Build Docker image
 docker:
 	docker build --platform linux/amd64 -t $(DOCKER_IMAGE_NAME) .
@@ -74,9 +78,10 @@ dockersave:
 	docker save $(DOCKER_IMAGE_NAME):latest | gzip > ../nvr_image.$(VERSION).tar.gz
 
 export:
-	docker create --name nvr-extractor $(DOCKER_IMAGE_NAME)
+	docker create --platform linux/amd64 --name nvr-extractor $(DOCKER_IMAGE_NAME)
 	docker cp nvr-extractor:/app/nvr_service ./dist/nvr_service
 	docker cp nvr-extractor:/app/nvr_worker ./dist/nvr_worker
+	cp -r ./web/dist ./dist/web
 	docker rm nvr-extractor
 
 # Run the Docker container
