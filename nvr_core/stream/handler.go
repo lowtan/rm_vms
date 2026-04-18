@@ -23,8 +23,7 @@ var upgrader = websocket.Upgrader{
 type Client struct {
 	hub                *Hub
 	conn               *websocket.Conn
-	send               chan []byte
-	waitingForKeyframe bool
+	subscriber         *Subscriber
 }
 
 // ServeWs handles websocket requests from the Vue frontend.
@@ -38,10 +37,13 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		hub:                hub,
 		conn:               conn,
-		send:               make(chan []byte, 256),
-		waitingForKeyframe: true, // Crucial for clean jmuxer initialization
+		subscriber: &Subscriber{
+			Send:               make(chan StreamPacket, 256),
+			WaitingForKeyframe: true, // Crucial for clean jmuxer initialization
+		},
 	}
-	client.hub.Register <- client
+
+	hub.Register <- client.subscriber
 
 	// Start the write pump for binary frames
 	go client.writePump()
@@ -56,7 +58,7 @@ func (c *Client) writePump() {
 	}()
 	for {
 		select {
-		case payload, ok := <-c.send:
+		case packet, ok := <-c.subscriber.Send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// Hub closed the channel
@@ -68,7 +70,7 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(payload)
+			w.Write(payloadForWebSocket(packet))
 
 			if err := w.Close(); err != nil {
 				return
@@ -79,7 +81,7 @@ func (c *Client) writePump() {
 
 func (c *Client) readPump() {
 	defer func() {
-		c.hub.Unregister <- c
+		c.hub.Unregister <- c.subscriber
 		c.conn.Close()
 	}()
 	for {
