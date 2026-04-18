@@ -1,9 +1,9 @@
 <template>
-  <div ref="timelineContainer" class="nvr-timeline-container"></div>
+  <div ref="timelineContainer" class="timeline-container"></div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, defineExpose, onBeforeUnmount, watch } from 'vue';
 import { Timeline } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
 
@@ -23,11 +23,15 @@ const props = defineProps({
     type: Object,
     required: false,
     default: () => ({})
-  }
+  },
+  initialTime: {
+    type: [Date, String, Number],
+    required: true
+  },
 });
 
 // Define the events we want to pass up to the parent Vue component
-const emit = defineEmits(['select', 'timechange', 'timechanged']);
+const emit = defineEmits(['select', 'timechange', 'timechanged', 'seek']);
 
 const timelineContainer = ref(null);
 let timelineInstance = null;
@@ -35,6 +39,7 @@ let itemsDataset = null;
 let groupsDataset = null;
 
 onMounted(() => {
+
   // Convert static arrays to vis-data DataSets for optimized rendering
   itemsDataset = new DataSet(props.items);
   if (props.groups.length > 0) {
@@ -49,12 +54,24 @@ onMounted(() => {
     props.options
   );
 
+  // 'playhead' is the internal ID we give this specific bar
+  timelineInstance.addCustomTime(props.initialTime, 'playhead');
+
   // Bind vis-timeline events to Vue emits
   timelineInstance.on('select', (properties) => emit('select', properties));
-  
+
+  // Handle clicks on the timeline background
+  timelineInstance.on('click', (properties) => {
+    // properties.time is the exact Date object where the user clicked
+    if (properties.time) {
+      timelineInstance.setCustomTime(properties.time, 'playhead');
+      emit('seek', properties.time);
+    }
+  });
+
   // 'timechange' fires repeatedly while dragging the custom time bar (scrubbing)
   timelineInstance.on('timechange', (properties) => emit('timechange', properties));
-  
+
   // 'timechanged' fires once when dragging stops
   timelineInstance.on('timechanged', (properties) => emit('timechanged', properties));
 });
@@ -80,6 +97,23 @@ watch(() => props.options, (newOptions) => {
   }
 }, { deep: true });
 
+
+// EXPOSE THIS TO THE PARENT
+// This allows the parent component to push the playhead forward continuously 
+// as the video plays, or jump it forward/backward by clicking external UI buttons.
+const setPlayheadTime = (newTime) => {
+  if (timelineInstance) {
+    timelineInstance.setCustomTime(newTime, 'playhead');
+
+    // Optional: Keep the timeline centered on the playhead if it moves off-screen
+    // timelineInstance.moveTo(newTime, { animation: true });
+  }
+};
+
+defineExpose({
+  setPlayheadTime
+});
+
 // CRITICAL: Clean up the instance when the component is unmounted
 onBeforeUnmount(() => {
   if (timelineInstance) {
@@ -90,10 +124,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-.nvr-timeline-container {
+.timeline-container {
   width: 100%;
   /* Optional: Set a min-height so it doesn't collapse before data loads */
   min-height: 150px; 
+  background: white;
+}
+
+.vis-item.vis-background.continuous-record {
+  background-color: rgba(99, 190, 99, .8);
 }
 
 /* You can override default vis-timeline CSS variables here */

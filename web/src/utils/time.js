@@ -1,15 +1,57 @@
+import { format, getUnixTime, fromUnixTime, startOfDay, endOfDay } from 'date-fns';
 
-const DayRange = function(day) {
+/**
+ * ========================================================
+ * Date Time Format Converting
+ * ========================================================
+ */
 
-    let y = day.getFullYear();
-    let m = day.getMonth();
-    let d = day.getDate();
+// getUnixTime automatically converts milliseconds to seconds
+const DatetimeToAPIStamps = function(date) {
+    return getUnixTime(date);
+}
 
-    let start = new Date(y,m,d,0,0,0,0).getTime();
-    let end = new Date(y,m,d,23,59,59,999).getTime();
+// fromUnixTime automatically converts seconds back to a Date object
+const APIStampsToDatetime = function(stamps) {
+    return fromUnixTime(stamps);
+}
 
-    return {start,end}
+// Safely formats to '2026-04-15T08:30:00', handling all zero-padding
+const ToTimelineStr = function(date) {
+    return format(date, "yyyy-MM-dd'T'HH:mm:ss");
+}
 
+const TimeCVT = {
+    DatetimeToAPIStamps,
+    APIStampsToDatetime,
+    ToTimelineStr,
+}
+
+/**
+ * Object-Oriented Wrapper
+ * Allows chaining or contextual operations around a specific Date.
+ * Added a default parameter so Time() safely defaults to now.
+ */
+const Time = function(date = new Date()) {
+    return {
+        APIStamp: () => getUnixTime(date),
+        Timeline: () => format(date, "yyyy-MM-dd'T'HH:mm:ss"),
+        Native: () => date // Always good to have an escape hatch to get the raw Date back
+    }
+}
+
+
+/**
+ * ========================================================
+ * Day Ranging
+ * ========================================================
+ */
+const DayRange = function(date) {
+    // startOfDay and endOfDay safely handle exact boundary calculations
+    let start = getUnixTime(startOfDay(date));
+    let end = getUnixTime(endOfDay(date));
+
+    return { start, end }
 }
 
 const TodayRange = function() {
@@ -17,6 +59,8 @@ const TodayRange = function() {
 }
 
 export {
+    Time,
+    TimeCVT,
     DayRange,
     TodayRange
 }
