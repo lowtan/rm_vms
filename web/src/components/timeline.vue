@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { Timeline } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
 

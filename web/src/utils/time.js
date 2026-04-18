@@ -1,10 +1,61 @@
-import { format, getUnixTime, fromUnixTime, startOfDay, endOfDay } from 'date-fns';
+import { format, getUnixTime, fromUnixTime, startOfDay, endOfDay, addDays, subDays } from 'date-fns';
+import DEFINE from './define';
+
+const DateFormat = 'yyyy-MM-dd';
+const TimelineFormat = "yyyy-MM-dd'T'HH:mm:ss";
+
+/**
+ * ========================================================
+ * Day Ranging
+ * ========================================================
+ */
+const APIDayRange = function(date) {
+
+    // startOfDay and endOfDay safely handle exact boundary calculations
+    let start = getUnixTime(startOfDay(date));
+    let end = getUnixTime(endOfDay(date));
+
+    return { start, end }
+}
+
+const DayRange = function(date) {
+
+    // startOfDay and endOfDay safely handle exact boundary calculations
+    let start = startOfDay(date);
+    let end = endOfDay(date);
+
+    return { start, end }
+}
+
+
+const APITodayRange = function() {
+    return APIDayRange(new Date)
+}
+
+const WebTimelineBoundaries = function(date) {
+
+    let range = DayRange(date);
+
+    let o = {
+        start: ToTimelineStr(range.start),
+        end: ToTimelineStr(range.end),
+        min: format(subDays(date, 1), "yyyy-MM-dd'T'23:00:00"),
+        max: format(addDays(date, 1), "yyyy-MM-dd'T'01:00:00"),
+    };
+
+    return o;
+}
+
 
 /**
  * ========================================================
  * Date Time Format Converting
  * ========================================================
  */
+
+const ToDateStr = function(date) {
+    return format(date, DateFormat);
+}
 
 // getUnixTime automatically converts milliseconds to seconds
 const DatetimeToAPIStamps = function(date) {
@@ -18,49 +69,50 @@ const APIStampsToDatetime = function(stamps) {
 
 // Safely formats to '2026-04-15T08:30:00', handling all zero-padding
 const ToTimelineStr = function(date) {
-    return format(date, "yyyy-MM-dd'T'HH:mm:ss");
+    return format(date, TimelineFormat);
 }
 
-const TimeCVT = {
-    DatetimeToAPIStamps,
-    APIStampsToDatetime,
-    ToTimelineStr,
-}
 
 /**
  * Object-Oriented Wrapper
  * Allows chaining or contextual operations around a specific Date.
  * Added a default parameter so Time() safely defaults to now.
  */
-const Time = function(date = new Date()) {
-    return {
-        APIStamp: () => getUnixTime(date),
-        Timeline: () => format(date, "yyyy-MM-dd'T'HH:mm:ss"),
-        Native: () => date // Always good to have an escape hatch to get the raw Date back
-    }
+const WebTime = function(date = new Date()) {
+
+    let wt = {};
+
+    DEFINE(wt)
+    .static("Native", date)
+    .static("APIStamp", () => getUnixTime(date))
+    .static("Timeline", () => format(date, TimelineFormat))
+
+    return wt;
+
+}
+
+const APITime = function(stamps) {
+
+    const date = fromUnixTime(stamps);
+
+    let obj = {};
+
+    DEFINE(obj)
+    .static("Native", date)
+    .static("WebTime", ()=>new WebTime(date))
+
+    return obj;
+
 }
 
 
-/**
- * ========================================================
- * Day Ranging
- * ========================================================
- */
-const DayRange = function(date) {
-    // startOfDay and endOfDay safely handle exact boundary calculations
-    let start = getUnixTime(startOfDay(date));
-    let end = getUnixTime(endOfDay(date));
-
-    return { start, end }
-}
-
-const TodayRange = function() {
-    return DayRange(new Date)
-}
 
 export {
-    Time,
-    TimeCVT,
+    ToDateStr,
+    WebTime,
+    APITime,
     DayRange,
-    TodayRange
+    APIDayRange,
+    APITodayRange,
+    WebTimelineBoundaries,
 }
