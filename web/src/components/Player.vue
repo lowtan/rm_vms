@@ -4,9 +4,10 @@
     <input type="date" :value="selectDayStr" @change="onSelectDayChange">
     <video src="" class="player-video"></video>
     <Timeline 
-      :initialTime="new Date"
+      ref="timelineRef"
       :items="timelineItems" 
       :options="timelineOptions"
+      :initialTime="currentPlaybackTime"
       @timechange="handleScrubbing"
       @seek="handleUserSeek"
     />
@@ -33,6 +34,9 @@ import {
   ToDateStr,
 } from '@/utils/time'
 
+// Reference to the child component
+const timelineRef = ref(null);
+const currentPlaybackTime = ref(new Date());
 
 let selectDay = ref(new Date);
 const selectDayStr = computed(() => {
@@ -106,15 +110,11 @@ const timelineOptionsByDate = function(date) {
 }
 
 const updateTimelineBounds = function(date) {
-
   let bounaries = WebTimelineBoundaries(date);
-
-  // Shift the timeline's visual window to the newly selected day
   timelineOptions.value = {
     ...timelineOptions.value,
     ...bounaries,
   };
-
 };
 
 const timelineOptions = ref(timelineOptionsByDate(selectDay.value));
@@ -133,13 +133,20 @@ const handleScrubbing = (properties) => {
 
 };
 
-const handleUserSeek = (seek) => {
+const handleUserSeek = (date) => {
 
   let ll = log.lin("[handleUserSeek]");
-  ll.log(seek);
 
-}
+  currentPlaybackTime.value = date;
 
+  // Send Unix timestamp to Go Backend
+  const timestampMs = date.getTime();
+  ll.log(`Commanding NVR to seek to: ${timestampMs}`);
+
+  // Example WebSocket Payload:
+  // ws.send(JSON.stringify({ command: 'SEEK', timestamp: timestampMs }));
+
+};
 
 const onSelectDayChange = (e)=> {
 
@@ -148,11 +155,17 @@ const onSelectDayChange = (e)=> {
   const newDate = new Date(`${e.target.value}T00:00:00`);
   selectDay.value = newDate;
 
-  ll.log("new date:", newDate);
-
   updateTimelineBounds(newDate);
   fetchTimeline(newDate);
 
+}
+
+const updatePlayheadFromVideoSync = (videoTimestampMs) => {
+  const newTime = new Date(videoTimestampMs);
+  currentPlaybackTime.value = newTime;
+  if (timelineRef.value) {
+    timelineRef.value.setPlayheadTime(newTime); // Just updates UI visually
+  }
 }
 
 </script>
