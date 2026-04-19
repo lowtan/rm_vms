@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 )
 
@@ -13,8 +14,10 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			// log.Printf("[CORSMiddleware] origin %s\n", origin)
 		} else {
 			w.Header().Set("Access-Control-Allow-Origin", "*") // Fallback for non-browser tools like Postman
+			// log.Printf("[CORSMiddleware] origin *\n")
 		}
 
 		// Universal Origin Allow (Change "*" to "http://localhost:5173" in strict production)
