@@ -69,8 +69,12 @@ func (w *Worker) handleStoppedStream(resp WorkerResponse) {
     w.mu.Lock()
     if cam, exists := w.cameras[resp.CamID]; exists {
         cam.Status = "Stopped"
+        if cam.ChannelID > -1 {
+            w.shmReader.StopChannel(resp.CamID, cam.ChannelID)
+        }
     }
     w.mu.Unlock()
+
 
     time.Sleep(8 * time.Second)
 
@@ -106,7 +110,7 @@ func (w *Worker) updateCameraSHMChannel(resp WorkerResponse) {
         return
     }
 
-    hub := w.shmReader.StartChannel(cam.ChannelID, existingHub)
+    hub := w.shmReader.StartChannel(resp.CamID, cam.ChannelID, existingHub)
 
     w.mu.Lock()
     w.streamHubs[resp.ChannelID] = hub
@@ -281,6 +285,12 @@ func (w *Worker) GetCameras() []*Camera {
         cameraList = append(cameraList, camera)
     }
     return cameraList
+}
+
+func (w *Worker) GetSHMReader() *shm.ReaderSHM {
+    w.mu.Lock()         // Lock before reading the map
+    defer w.mu.Unlock() // Ensure it unlocks when the function finishes
+    return w.shmReader
 }
 
 /**

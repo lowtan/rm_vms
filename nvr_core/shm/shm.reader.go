@@ -2,10 +2,10 @@ package shm
 
 import (
 	// "context"
-	"fmt"
+	// "fmt"
 	"log"
 	"nvr_core/stream"
-	"os"
+	// "os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -70,7 +70,7 @@ func (r *ReaderSHM) FilePath() string {
 	return ""
 }
 
-func (r *ReaderSHM) StartChannel(channelID int, existingHub *stream.Hub) *stream.Hub {
+func (r *ReaderSHM) StartChannel(camID int, channelID int, existingHub *stream.Hub) *stream.Hub {
 
 	rb := r.worker.Channels[channelID]
 	if(rb == nil) {
@@ -79,6 +79,7 @@ func (r *ReaderSHM) StartChannel(channelID int, existingHub *stream.Hub) *stream
 		return nil;
 	}
 
+	r.camChannels[camID] = channelID
 	hub := existingHub
 	if(hub == nil) {
 
@@ -100,12 +101,13 @@ func (r *ReaderSHM) StartChannel(channelID int, existingHub *stream.Hub) *stream
 
 }
 
-func (r *ReaderSHM) stopChannel(channelID int) {
+func (r *ReaderSHM) StopChannel(camID int, channelID int) {
 	stopper := r.channelStopper[channelID]
 	if stopper == nil {
 		return
 	}
 	stopper.Store(true);
+	delete(r.camChannels, camID);
 }
 
 // readChannelLoop continuously polls a specific RingBuffer for new frames
@@ -152,6 +154,22 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 
 }
 
+// GetWorkerMetrics polls the atomic state of all active channels for this worker
+func (r *ReaderSHM) GetWorkerMetrics() *WorkerMetrics {
+	metrics := &WorkerMetrics{
+		WorkerID: r.workerName,
+		Channels: make(map[int]*ChannelMetrics),
+	}
+
+	for channelID, camID := range r.camChannels {
+		if rb := r.worker.Channels[channelID]; rb != nil {
+			metrics.Channels[channelID] = rb.GetMetrics(camID, channelID)
+		}
+	}
+
+	return metrics
+}
+
 // Close safely stops all polling goroutines and unmaps the shared memory
 func (r *ReaderSHM) Close() {
 	log.Printf("[shm.reader] Closing SHM Reader for %s\n", r.workerName)
@@ -170,16 +188,16 @@ func (r *ReaderSHM) Close() {
 	}
 }
 
-func fileDumpTest(frame []byte, worker string, channel int) {
+// func fileDumpTest(frame []byte, worker string, channel int) {
 
-	f, err := os.OpenFile(fmt.Sprintf("/app/recordings/debug_worker%v_cam_%d.264", worker, channel), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
+// 	f, err := os.OpenFile(fmt.Sprintf("/app/recordings/debug_worker%v_cam_%d.264", worker, channel), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer f.Close()
 
-	if _, err := f.Write(frame); err != nil {
-		log.Println("Write error:", err)
-	}
+// 	if _, err := f.Write(frame); err != nil {
+// 		log.Println("Write error:", err)
+// 	}
 
-}
+// }

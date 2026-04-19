@@ -155,6 +155,39 @@ func (rb *RingBuffer) ReadFrame() (FrameMetadata, []byte, bool) {
 	return meta, frameData, true
 }
 
+// GetMetrics calculates the real-time saturation of the ring buffer
+func (rb *RingBuffer) GetMetrics(camID int, channelID int) *ChannelMetrics {
+	head := atomic.LoadUint32(&rb.Header.WriteHead)
+	tail := atomic.LoadUint32(&rb.Header.ReadTail)
+
+	var bytesBuffered uint32
+
+	// Calculate distance considering wrap-around
+	if head >= tail {
+		bytesBuffered = head - tail
+	} else {
+		// Head wrapped back to 0, but Tail is still finishing the end of the buffer
+		bytesBuffered = (rb.Capacity - tail) + head
+	}
+
+	saturation := float64(bytesBuffered) / float64(rb.Capacity) * 100.0
+
+	// If the buffer is over 95% full, the Go reader is dangerously close to 
+	// being overtaken by the C++ writer (a buffer stall/overflow).
+	isStalled := saturation > 95.0
+
+	return &ChannelMetrics{
+		CamID:         camID,
+		ChannelID:     channelID,
+		Capacity:      rb.Capacity,
+		Head:          head,
+		Tail:          tail,
+		BytesBuffered: bytesBuffered,
+		SaturationPct: saturation,
+		IsStalled:     isStalled,
+	}
+}
+
 
 func (w *WorkerSHM) Close() {
 	syscall.Munmap(w.data)
