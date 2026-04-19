@@ -15,7 +15,7 @@ import (
 func (api *APIServer) HandleLiveTransmuxTS(w http.ResponseWriter, r *http.Request) {
 
 	// --- CRITICAL SECURITY OVERRIDE ---
-	// Our global API server has a strict 10-second WriteTimeout.
+	// The global API server has a strict 10-second WriteTimeout.
 	// Since this is an endless stream, we use the ResponseController to 
 	// disable the write deadline specifically for this individual request.
 	rc := http.NewResponseController(w)
@@ -53,7 +53,7 @@ func (api *APIServer) HandleLiveTransmuxTS(w http.ResponseWriter, r *http.Reques
 		WaitingForKeyframe: true, // Crucial: TS decoders need the SPS/PPS keyframe first
 	}
 	hub.Register <- sub
-	
+
 	// Ensure we unregister when the HTTP request drops
 	defer func() {
 		hub.Unregister <- sub
@@ -87,7 +87,7 @@ func (api *APIServer) HandleLiveTransmuxTS(w http.ResponseWriter, r *http.Reques
 				return // Hub channel closed
 			}
 
-			// --- 1. LATE BINDING & TABLE REPETITION ---
+			// --- LATE BINDING & TABLE REPETITION ---
 			if packet.MediaType == stream.MediaTypeAudio && !pmtWritten {
 				// Cache audio codec but drop packet until Video Keyframe arrives
 				audioCodec = packet.CodecID
@@ -120,7 +120,7 @@ func (api *APIServer) HandleLiveTransmuxTS(w http.ResponseWriter, r *http.Reques
 				continue
 			}
 
-			// --- 2. DEMUXING AND PACKETIZING ---
+			// --- DEMUXING AND PACKETIZING ---
 			var streamID uint8
 			var targetPID uint16
 
@@ -153,7 +153,7 @@ func (api *APIServer) HandleLiveTransmuxTS(w http.ResponseWriter, r *http.Reques
 				PID: targetPID,
 			}
 
-			// CRITICAL FIX: Inject the Master Clock (PCR)
+			// Inject the Master Clock (PCR)
 			// VLC will not render a single frame without a PCR to synchronize its timeline.
 			if packet.MediaType == stream.MediaTypeVideo {
 				muxerData.AdaptationField = &astits.PacketAdaptationField{

@@ -22,6 +22,11 @@ func PathForCameraVODPlaylistURL(camID string, start int64, end int64) string {
 }
 
 
+// For MPEG-TS live stream
+func URLForCameraLiveTSStream(baseUrl string, camID string) string {
+	return fmt.Sprintf("%s/live/camera/%s", baseUrl, camID)
+}
+
 // For WebSocket live stream
 func URLForCameraWSStream(host string, camID string) string {
 	return fmt.Sprintf("ws://%s/ws/stream/%s", host, camID)
