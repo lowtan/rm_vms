@@ -1,9 +1,10 @@
 
 import timeline from "./timeline"
-
+import shmMetrics from "./shm.metrics"
 
 const API = {
-    timeline
+    timeline,
+    shmMetrics,
 }
 
 export default API
