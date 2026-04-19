@@ -161,7 +161,7 @@ func (r *ReaderSHM) GetWorkerMetrics() *WorkerMetrics {
 		Channels: make(map[int]*ChannelMetrics),
 	}
 
-	for channelID, camID := range r.camChannels {
+	for camID, channelID := range r.camChannels {
 		if rb := r.worker.Channels[channelID]; rb != nil {
 			metrics.Channels[channelID] = rb.GetMetrics(camID, channelID)
 		}
