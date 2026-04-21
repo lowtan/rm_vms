@@ -81,8 +81,7 @@ export:
 	docker create --platform linux/amd64 --name nvr-extractor $(DOCKER_IMAGE_NAME)
 	docker cp nvr-extractor:/app/nvr_service ./dist/nvr_service
 	docker cp nvr-extractor:/app/nvr_worker ./dist/nvr_worker
-	rm -rf ./dist/web
-	cp -r ./web/dist ./dist/web
+	rsync -av --delete ./web/dist/* ./dist/web
 	docker rm nvr-extractor
 
 # Run the Docker container

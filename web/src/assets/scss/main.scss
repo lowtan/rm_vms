@@ -1,0 +1,11 @@
+$body-bg: #1e1e2e;
+$body-color: #cdd6f4;
+$primary: #89b4fa;
+$success: #a6e3a1;
+$danger: #f38ba8;
+$warning: #f9e2af;
+
+@import "bootstrap/scss/bootstrap";
+
+@import "@/assets/scss/animation.scss";
+@import "@/assets/scss/loading.scss";

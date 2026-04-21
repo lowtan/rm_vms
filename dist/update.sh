@@ -12,8 +12,9 @@ systemctl stop nvr.service
 echo "⚙️ Step 2: Updating..."
 cp nvr_service /opt/nvr/bin/
 cp nvr_worker /opt/nvr/bin/
-rm -rf /opt/nvr/bin/web
-cp -r web /opt/nvr/bin/web
+# rm -rf /opt/nvr/bin/web
+# cp -r web /opt/nvr/bin/web
+rsync -v --delete web/* /opt/nvr/bin/web
 
 echo "🔄 Step 3: Starting systemd background service..."
 systemctl start nvr.service

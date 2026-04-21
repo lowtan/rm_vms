@@ -52,7 +52,7 @@ func main() {
 
 	go apiserver.Initiate(ctx, cfg, pm, servs)
 
-	go webserver.ServeWeb(cfg.Server.WebPort)
+	go webserver.ServeWeb(cfg)
 
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()

@@ -1,8 +1,9 @@
 
+import config from '@/config'
 import axios from 'axios'
 
-const HostBase = "//localhost:59180/"
-const APIBase = "api"
+const HostBase = config.hostUrl;
+const APIBase = "api";
 
 const URLJoin = function(...comps) {
     return comps.join("/");
