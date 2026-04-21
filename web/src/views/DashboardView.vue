@@ -1,12 +1,16 @@
 <template>
   <div class="dashboard">
     <h1>Dashboard</h1>
-<!--     <div class="loader-wrap">
-      <div class="loader"></div>
-    </div> -->
-    <button class="btn btn-primary" @click="toogleRefresh">{{ToogleRefreshTitle}}</button>
-    <span>{{lastUpdate}}</span>
-    <SHMMetrics :metrics="metrics"></SHMMetrics>
+    <div class="row my-2">
+      <div class="col-1">
+        <button class="btn btn-primary me-1" @click="toogleRefresh">{{ToogleRefreshTitle}}
+        </button>
+        <Loader v-if="metricsLoader.loading"/>
+      </div>
+      <span class="col">{{lastUpdate}}</span>
+    </div>
+    <CameraList class="row" :cameras="cameras"></CameraList>
+    <SHMMetrics class="row" :metrics="metrics"></SHMMetrics>
   </div>
 </template>
 
@@ -14,27 +18,75 @@
 <script setup>
 import Logger from '@/utils/log';
 
-const log = Logger.withPrefix("[Dashboard]");
+const logger = Logger.withPrefix("[Dashboard]");
+logger.log("init")
 
 import { ref, computed } from 'vue';
 
 import SHMMetrics from '@/components/SHMMetrics.vue';
+import CameraList from '@/components/CameraList.vue';
+import Loader from '@/components/Loader.vue';
+
+import BusyLoader from '@/models/busy.loader'
 
 import API from '@/api';
 
 const metrics = ref([]);
+const cameras = ref([]);
+const metricsLoader = BusyLoader();
+
+const UpdateCameras = function() {
+
+  let ll = logger.lin("[UpdateCameras]")
+
+  API.cameras.list()
+  .then(response=>{
+
+    let data = response.data;
+    if (typeof data === "object") {
+
+      // metrics.value = data;
+      // lastUpdate.value = new Date;
+      ll.log("data", data);
+      cameras.value = data;
+
+    } else {
+
+      ll.log("response", response);
+      ll.log("data type", typeof response.data)
+
+    }
+
+  })
+
+
+}
 
 const UpdateData = function() {
 
-  log.log("updating...")
+  UpdateCameras()
+
+  logger.log("updating...")
+  metricsLoader.busy()
 
   API.shmMetrics()
   .then(response=>{
 
-    metrics.value = response.data;
-    lastUpdate.value = new Date;
+    let data = response.data;
+    if (typeof data === "object") {
+
+      metrics.value = data;
+      lastUpdate.value = new Date;
+
+    } else {
+
+      logger.log("response", response);
+      logger.log("data type", typeof response.data)
+
+    }
 
   })
+  .finally(metricsLoader.idle)
 
 }
 
@@ -55,11 +107,12 @@ const toogleRefresh = function() {
     clearInterval(RefreshTimer.value);
     RefreshTimer.value = undefined
   } else {
-    RefreshTimer.value = setInterval(UpdateData, 2000);
+    RefreshTimer.value = setInterval(UpdateData, 5000);
   }
 
 }
 
+UpdateData()
 toogleRefresh()
 
 </script>

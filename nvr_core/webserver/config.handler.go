@@ -10,12 +10,14 @@ import (
 type WebConfig struct {
     APIPort int    `json:"apiPort"`
     WSUrl   string `json:"wsUrl"`
+    Debug   bool   `json:"DEBUG"`
 }
 
 func GenerateConfig(config *utils.Config) WebConfig {
 
-    return WebConfig{
+    return WebConfig {
         APIPort: config.Server.Port,
+        Debug: true,
     }
 
 }
