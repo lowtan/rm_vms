@@ -35,9 +35,6 @@ type APIServer struct {
 
 func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs *service.Services) {
 
-	// segRepo := repository.NewSegmentRepository(dbConn)
-	// dbH := NewDebugHandler(ctx, dbConn, segRepo)
-
 	log.Println("Initializing API server")
 
 	state := NewNVRState()

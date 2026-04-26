@@ -4,6 +4,7 @@ import (
 	// "encoding/binary"
 	// "log"
 	// "fmt"
+	"log/slog"
 	"os"
 	"sync/atomic"
 	"syscall"
@@ -127,13 +128,10 @@ func (rb *RingBuffer) ReadFrame() (FrameMetadata, []byte, bool) {
 		}
 	}
 
-	meta.LoadFrom(metaBytes)
-	// Extract Metadata
-	// Note: frameSize is now at offset 4:8 because magic takes 0:4
-	// frameSize := binary.LittleEndian.Uint32(metaBytes[4:8])
-	// timestamp := binary.LittleEndian.Uint64(metaBytes[8:16])
-	// isKeyFrame := metaBytes[16] !=0 // Available if you need it later
-	// mediaType := metaBytes[17]
+	if err := meta.LoadFrom(metaBytes); err != nil {
+	    slog.Error("Failed to load Metadata", slog.Any("error", err))
+	    return FrameMetadata{}, nil, false
+	}
 
 	start := tail + MetadataSize
 	end := start + meta.FrameSize

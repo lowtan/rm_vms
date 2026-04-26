@@ -140,11 +140,14 @@ func (r *ReaderSHM) readChannelLoop(stop *atomic.Bool, channelID int, rb *RingBu
 		// You can route this data to disk, a WebSocket, or a WebRTC pipeline.
 
 		f := stream.StreamPacket {
-			IsKeyFrame: meta.IsKeyFrame != 0,
-			Payload: frameData,
-			MediaType: meta.MediaType,
-			CodecID:   meta.CodecID,
-			// Timestamp: meta.Timestamp,
+			MediaType:  meta.MediaType,
+			CodecID:    meta.CodecID,
+			IsKeyFrame: meta.IsKeyFrame == 1,
+			PTS:        meta.PTS,
+			DTS:        meta.DTS,
+
+			// Create a copy of the payload so the ring buffer can overwrite the old memory safely
+			Payload:    frameData,
 		}
 
 		bc.Broadcast <- f

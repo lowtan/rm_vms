@@ -8,6 +8,7 @@ import (
 
 // Services acts as a dependency injection container for the API layer.
 // The API layer knows NOTHING about SQLite or Repositories, only these interfaces.
+// Even though, it's a bridge between API process and Repositories.
 type Services struct {
 	Timeline   TimelineService
 	Playback   PlaybackService

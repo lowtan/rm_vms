@@ -2,6 +2,7 @@
 
 #include "StorePath.h"
 #include "Log.h"
+#include "utils/Time.h"
 
 #include <chrono>
 #include <string>
@@ -14,10 +15,6 @@ extern "C" {
 const int RECORDING_ROTATE_TIME = 1; // By minute
 
 
-static inline long getCurrentUnixTime() {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
-}
 
 RecorderWorker::RecorderWorker(std::string rp) : rootPath(rp) {}
 
@@ -90,7 +87,7 @@ void RecorderWorker::writerWorker(SafeQueue<AVPacket*>& queue, AVStream* inVideo
 
             // Generate the precise directory tree and filename (e.g., /recordings/cam01/2026/03/12/15-30-00.mp4)
             currentFilePath = pathGenerator.For(camID, packet); 
-            currentStartTimeUnix = getCurrentUnixTime();
+            currentStartTimeUnix = utils::getCurrentUnixTime();
 
             // Pass both streams to the SegmentRecorder so it can allocate the MP4 tracks
             recorder.StartSegment(currentFilePath, inVideoStream, inAudioStream);

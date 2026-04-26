@@ -4,6 +4,8 @@
 // #include <string>
 #include <chrono>
 
+#include "utils/Time.h"
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h> // You may need this for av_packet_alloc, etc.
@@ -207,23 +209,32 @@ void VideoIngestion::packetToDiskWriter(AVPacket* packet) {
  * =========================================================
  */
 FrameMetadata VideoIngestion::makeFrameMetadataV(AVPacket* packet, bool isKey) {
-    // Construct the metadata cleanly
     FrameMetadata meta;
-    meta.timestamp = packet->pts;
+
+    // Grab the absolute Wall-Clock time in milliseconds
+    meta.epochMs = utils::getCurrentEpochMSTime();
+
     meta.magic = WrapMagicNumber;
     meta.frameSize = packet->size;
+    meta.pts = packet->pts;
+    meta.dts = packet->dts;
     meta.isKeyFrame = isKey ? 1 : 0;
     meta.codecID = videoCodecID;
     meta.mediaType = static_cast<uint8_t>(MediaType::VIDEO);
+
     return meta;
+
 }
 
 FrameMetadata VideoIngestion::makeFrameMetadataA(AVPacket* packet) {
     // Construct the metadata cleanly
     FrameMetadata meta;
-    meta.timestamp = packet->pts;
+    meta.epochMs = utils::getCurrentEpochMSTime();
+
     meta.magic = WrapMagicNumber;
     meta.frameSize = packet->size;
+    meta.pts = packet->pts;
+    meta.dts = packet->dts;
     meta.isKeyFrame = 0;
     meta.codecID = audioCodecID;
     meta.mediaType = static_cast<uint8_t>(MediaType::AUDIO);

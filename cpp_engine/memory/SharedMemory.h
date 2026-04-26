@@ -16,13 +16,17 @@ enum class MediaType : uint8_t {
 };
 
 struct FrameMetadata {
-    uint64_t timestamp;    // 8 bytes (Offset 0)
-    uint32_t magic;        // 4 bytes (Offset 8)
-    uint32_t frameSize;    // 4 bytes (Offset 12)
-    uint32_t codecID;      // 4 bytes (Offset 16)
-    uint8_t  isKeyFrame;   // 1 byte  (Offset 20)
-    uint8_t  mediaType;    // 1 byte  (Offset 21)
-    uint8_t  _padding[42]; // 42 bytes(Offset 22) -> Total: EXACTLY 64 bytes
+    uint32_t magic;        // 4 bytes (Offset 0)
+    uint32_t frameSize;    // 4 bytes (Offset 4)  -> Sum: 8 bytes (Perfectly aligned for the next 8-byte var)
+    
+    uint64_t epochMs;      // 8 bytes (Offset 8)  -> Wall-clock time
+    int64_t  pts;          // 8 bytes (Offset 16) -> Presentation Time
+    int64_t  dts;          // 8 bytes (Offset 24) -> Decoding Time
+    
+    uint32_t codecID;      // 4 bytes (Offset 32)
+    uint8_t  isKeyFrame;   // 1 byte  (Offset 36)
+    uint8_t  mediaType;    // 1 byte  (Offset 37)
+    uint8_t  _padding[26]; // 26 bytes(Offset 38) -> Total: EXACTLY 64 bytes
 };
 
 struct RingBufferHeader {

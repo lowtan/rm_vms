@@ -8,12 +8,14 @@ type Subscriber struct {
 	WaitingForKeyframe bool
 }
 
-// StreamPacket encapsulates the raw H.264/H.265 payload and its metadata.
+// StreamPacket encapsulates the raw video payload and its metadata.
 type StreamPacket struct {
-	IsKeyFrame bool
-	Payload    []byte
 	MediaType  uint8  // 0 = Video, 1 = Audio
 	CodecID    uint32
+	IsKeyFrame bool
+	PTS        int64
+	DTS        int64
+	Payload    []byte
 }
 
 // MediaType constants to match your C++ definitions
@@ -33,8 +35,7 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		// Broadcast:  make(chan StreamPacket, 999999), // Buffered to handle high FPS bursts
-		Broadcast:  make(chan StreamPacket, 256), // Buffered to handle high FPS bursts
+		Broadcast:  make(chan StreamPacket, 2048), // Buffered to handle high FPS bursts
 		Register:   make(chan *Subscriber),
 		Unregister: make(chan *Subscriber),
 		subscribers:    make(map[*Subscriber]bool),
