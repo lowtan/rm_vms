@@ -1,60 +1,69 @@
 package logger
 
 import (
-	"fmt"
-	"log"
-	"os"
+	"context"
+	"log/slog"
 )
 
-// Logger wraps the standard Go logger to provide chainable prefixes.
+// Logger wraps the standard Go slog.Logger to provide chainable data.
 type Logger struct {
-	prefix string
-	base   *log.Logger
+	lin *slog.Logger
 }
 
-// WithPrefix creates a new base logger.
-func WithPrefix(prefix string) *Logger {
+func NewLogger(v ...any) *Logger {
 	return &Logger{
-		prefix: prefix,
-		// log.New ensures thread-safe, non-interleaved writes to stdout.
-		// You can remove log.Ldate|log.Ltime if you only want the raw text.
-		base: log.New(os.Stdout, "", log.Ldate|log.Ltime),
+		lin: slog.Default().With(v...),
 	}
 }
 
-func (l *Logger) WithPrefixf(prefix string, v ...any) *Logger {
-	formatted := fmt.Sprintf(prefix, v...)
+func (l *Logger) Lin(v ...any) *Logger {
 	return &Logger{
-		prefix: formatted,
-		base: log.New(os.Stdout, "", log.Ldate|log.Ltime),
+		lin: l.lin.With(v...),
 	}
 }
 
+/**
+ * ======================================================
+ * Core Logging Functions
+ * ======================================================
+ */
 
-// Lin spawns a child logger that inherits and appends to the parent's prefix.
-func (l *Logger) Lin(subPrefix string) *Logger {
-	return &Logger{
-		prefix: l.prefix + subPrefix,
-		base:   l.base, // Share the underlying thread-safe writer
-	}
+func (l *Logger) Debug(msg string, v ...any) {
+	l.lin.Debug(msg, v...)
 }
 
-func (l *Logger) Linf(subPrefix string, v ...any) *Logger {
-	formatted := fmt.Sprintf(subPrefix, v...)
-	return &Logger{
-		prefix: l.prefix + formatted,
-		base:   l.base, // Share the underlying thread-safe writer
-	}
+func (l *Logger) Info(msg string, v ...any) {
+	l.lin.Info(msg, v...)
 }
 
-// Log acts like fmt.Println, automatically handling the prefix spacing.
-func (l *Logger) Log(v ...any) {
-	message := fmt.Sprint(v...)
-	l.base.Printf("%s %s", l.prefix, message)
+func (l *Logger) Warn(msg string, v ...any) {
+	l.lin.Warn(msg, v...)
 }
 
-// Logf provides formatted logging (like fmt.Printf).
-func (l *Logger) Logf(format string, v ...any) {
-	message := fmt.Sprintf(format, v...)
-	l.base.Printf("%s %s", l.prefix, message)
+func (l *Logger) Error(msg string, v ...any) {
+	l.lin.Error(msg, v...)
+}
+
+/**
+ * ======================================================
+ * Context-Aware Logging Functions
+ * ======================================================
+ * These are crucial for Go web servers and concurrent workers
+ * so slog can extract trace IDs or cancellation states from the context.
+ */
+
+func (l *Logger) DebugContext(ctx context.Context, msg string, v ...any) {
+	l.lin.DebugContext(ctx, msg, v...)
+}
+
+func (l *Logger) InfoContext(ctx context.Context, msg string, v ...any) {
+	l.lin.InfoContext(ctx, msg, v...)
+}
+
+func (l *Logger) WarnContext(ctx context.Context, msg string, v ...any) {
+	l.lin.WarnContext(ctx, msg, v...)
+}
+
+func (l *Logger) ErrorContext(ctx context.Context, msg string, v ...any) {
+	l.lin.ErrorContext(ctx, msg, v...)
 }

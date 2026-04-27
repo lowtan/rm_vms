@@ -6,17 +6,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"nvr_core/db/models"
-	"nvr_core/service"
-	"nvr_core/shm"
-	"nvr_core/stream"
-	"nvr_core/utils"
 	"os"
 	"os/exec"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
+
+    "nvr_core/db/models"
+    "nvr_core/logger"
+    "nvr_core/service"
+    "nvr_core/shm"
+    "nvr_core/stream"
+    "nvr_core/utils"
 )
 
 const LOGSEP = "==============================================\n"
@@ -51,6 +53,7 @@ type Worker struct {
     mu           sync.Mutex // Protects concurrent writes to Stdin
     dmu          utils.DebugMutex
     ingester     service.IngestService
+    log          *logger.Logger
 }
 
 // NewWorker creates a struct but doesn't start the process yet
@@ -60,7 +63,8 @@ func NewWorker(id int, binaryPath string, ingester service.IngestService) *Worke
         BinaryPath: binaryPath,
         cameras: make(map[int]*Camera),
         streamHubs: make(map[int]*stream.Hub),
-        ingester: ingester,
+        ingester:   ingester,
+        log:        LOG.Lin("worker",id),
     }
 }
 

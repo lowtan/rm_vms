@@ -41,7 +41,6 @@ func main() {
 	}
 
 
-
 	fmt.Printf("[Go Manager] Config Loaded. Storage: %s, Cameras: %d\n", 
 			cfg.Server.StoragePath, len(cfg.Cameras))
 
@@ -57,7 +56,7 @@ func main() {
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()
 
-	fmt.Println("\n[Signal] Shutdown signal received. Gracefully terminating subsystems...")
+	fmt.Println("\n[Signal] Shutdown signal received. Terminating in 5 seconds...")
 
 	// TODO:
 	// At this point, the context is canceled. 

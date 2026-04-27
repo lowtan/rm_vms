@@ -3,8 +3,8 @@ package process
 import (
 	"context"
 	"fmt"
-	"log"
-	// "nvr_core/db/ingest"
+
+	"nvr_core/logger"
 	"nvr_core/service"
 	"nvr_core/utils"
 )
@@ -17,6 +17,7 @@ type Manager struct {
 	binaryPath string
 	camWorker  map[int]int
 	ingester   service.IngestService
+	log        *logger.Logger
 }
 
 // NewManager initializes the pool (e.g., count=4)
@@ -28,6 +29,7 @@ func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath st
 		binaryPath: binaryPath,
 		camWorker: make(map[int]int),
 		ingester:   ingester,
+		log: LOG.Lin("sub","[manager]"),
 	}
 
 	// Initialize workers
@@ -43,7 +45,8 @@ func NewManager(ctx context.Context, cfg *utils.Config, count int, binaryPath st
 // StartAll launches all worker processes
 func (m *Manager) StartAll() error {
 	for _, w := range m.workers {
-		fmt.Printf("[Process Manager] Starting Worker %d...\n", w.ID)
+		// fmt.Printf("[Process Manager] Starting Worker %d...\n", w.ID)
+		m.log.Info("Starting Worker", "worker", w.ID)
 		if err := w.Start(m.ctx); err != nil {
 			return err
 		}
@@ -53,7 +56,7 @@ func (m *Manager) StartAll() error {
 
 // StopAll shuts them down
 func (m *Manager) StopAll() {
-	log.Printf("[Manager][StopAll]")
+	m.log.Info("[StopAll]")
 	for _, w := range m.workers {
 		w.Stop()
 	}
@@ -75,7 +78,7 @@ func (m *Manager) AssignCamera(camID int, url string) error {
 
 	m.camWorker[camID] = workerIndex;
 
-	log.Printf("[Manager][AssignCamera] Routing Cam %d -> Worker %d\n", camID, workerIndex);
+	m.log.Info("[AssignCamera]", "cam", camID, "worker", workerIndex);
 
 	return targetWorker.AssignCam(NewCamera(camID, url));
 }
@@ -83,8 +86,5 @@ func (m *Manager) AssignCamera(camID int, url string) error {
 func (m *Manager) CameraWorker(camID int) *Worker {
 
 	index := m.camWorker[camID];
-
-	log.Printf("[Manager][CameraWorker] Cam %d -> Worker %d\n", camID, index);
-
 	return m.workers[index];
 }

@@ -38,3 +38,22 @@ func (b *LogBuffer) Snapshot() []string {
 	copy(copyItems, b.items)
 	return copyItems
 }
+
+/**
+ * Usage
+ */
+
+// Initialize the Storage
+// logMemory := buffer.NewBuffer(1000)
+
+// // Configure the Logger (Writing to Stdout AND the Buffer)
+// multiWriter := io.MultiWriter(os.Stdout, logMemory)
+// logger := slog.New(slog.NewJSONHandler(multiWriter, nil))
+// slog.SetDefault(logger) // Set as global default for the app
+
+// Initialize the Delivery System (Injecting the Buffer into the API)
+// logAPI := api.NewLogHandler(logMemory)
+
+// Start the HTTP Server
+// mux := http.NewServeMux()
+// mux.Handle("/api/logs", logAPI)

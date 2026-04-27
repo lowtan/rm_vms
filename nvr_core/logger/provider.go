@@ -1,6 +1,5 @@
 package logger
 
-// LogProvider defines the exact behavior this API needs to do its job.
 type LogProvider interface {
 	Snapshot() []string
 }
