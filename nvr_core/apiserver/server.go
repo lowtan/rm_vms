@@ -59,6 +59,12 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("POST /api/login", api.HandleLogin)
 
 	// =============================================
+	// User Management
+	// =============================================
+	mux.HandleFunc("PUT /api/users/{id}/permissions", api.HandleUpdateUserPermissions)
+
+
+	// =============================================
 	// Camera Discovery
 	// =============================================
 	mux.HandleFunc("GET /api/scan", api.HandleCameraScan)

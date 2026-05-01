@@ -1,0 +1,51 @@
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"nvr_core/db/repository"
+)
+
+type UserManagementService interface {
+	UpdateUserRole(ctx context.Context, adminID, targetUserID, newRoleID int64) error
+	GrantPermission(ctx context.Context, adminID, targetUserID, permID int64) error
+	RevokePermission(ctx context.Context, adminID, targetUserID, permID int64) error
+	UpdateUserPermissions(ctx context.Context, adminID, targetUserID int64, permIDs []int64) error
+}
+
+type userManagementService struct {
+	userRepo repository.UserRepository
+	permRepo repository.PermissionRepository
+}
+
+func NewUserManagementService(uRepo repository.UserRepository, pRepo repository.PermissionRepository) UserManagementService {
+	return &userManagementService{userRepo: uRepo, permRepo: pRepo}
+}
+
+func (s *userManagementService) UpdateUserRole(ctx context.Context, adminID, targetUserID, newRoleID int64) error {
+	// Business Rule: Ensure target user actually exists before modifying
+	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
+		return fmt.Errorf("target user verification failed: %w", err)
+	}
+	return s.userRepo.UpdateRole(ctx, targetUserID, newRoleID)
+}
+
+func (s *userManagementService) GrantPermission(ctx context.Context, adminID, targetUserID, permID int64) error {
+	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
+		return err
+	}
+	return s.permRepo.GrantUserPermission(ctx, targetUserID, permID)
+}
+
+func (s *userManagementService) RevokePermission(ctx context.Context, adminID, targetUserID, permID int64) error {
+	return s.permRepo.RevokeUserPermission(ctx, targetUserID, permID)
+}
+
+func (s *userManagementService) UpdateUserPermissions(ctx context.Context, adminID, targetUserID int64, permIDs []int64) error {
+	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
+		return err
+	}
+	// Delegate the bulk replacement to the transactional repository method
+	return s.permRepo.ReplaceUserPermissions(ctx, targetUserID, permIDs)
+}

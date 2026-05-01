@@ -11,6 +11,7 @@ import (
 // Even though, it's a bridge between API process and Repositories.
 type Services struct {
 	Auth       AuthService
+	User       UserManagementService
 	Timeline   TimelineService
 	Playback   PlaybackService
 	Playlist   PlaylistService
@@ -31,9 +32,11 @@ func NewServices(dbConn *sql.DB) *Services {
 	systemSvc := NewSystemService(dbConn, segRepo)
 	// Some random secret key for now
 	authSvc := NewAuthService(userRepo, permRepo, ")($#YHdsJdsx")
+	userSvc := NewUserManagementService(userRepo, permRepo)
 
 	return &Services{
 		Auth:     authSvc,
+		User:     userSvc,
 		Timeline: timelineSvc,
 		Playback: playbackSvc,
 		Playlist: playlistSvc,

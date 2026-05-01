@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"nvr_core/db/repository"
-	"nvr_core/utils" // Assuming this is where CheckPasswordHash lives
+	"nvr_core/utils"
 )
 
 var (
@@ -34,10 +34,8 @@ func NewAuthService(userRepo repository.UserRepository, permRepo repository.Perm
 	}
 }
 
-// In services.base.go, you must add `jwtSecret []byte` and `tokenExpir time.Duration` to authServiceBase.
-
 func (s *authServiceBase) Login(ctx context.Context, username, password string) (string, []string, error) {
-	// 1. Fetch user by username
+	// Fetch user by username
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -46,23 +44,23 @@ func (s *authServiceBase) Login(ctx context.Context, username, password string) 
 		return "", nil, err
 	}
 
-	// 2. Check active status
+	// Check active status
 	if !user.IsActive {
 		return "", nil, ErrAccountDisabled
 	}
 
-	// 3. Verify bcrypt password hash
+	// Verify bcrypt password hash
 	if !utils.CheckPasswordHash(password, user.Password) {
 		return "", nil, ErrInvalidCredentials
 	}
 
-	// 4. Fetch the aggregated permissions (Role + Direct Grants)
+	// Fetch the aggregated permissions (Role + Direct Grants)
 	permissions, err := s.permRepo.GetUserPermissionCodes(ctx, user.ID)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// 5. Construct the JWT Claims
+	// Construct the JWT Claims
 	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"name":  user.Username,
@@ -72,7 +70,7 @@ func (s *authServiceBase) Login(ctx context.Context, username, password string) 
 		"exp":   time.Now().Add(s.tokenExpir).Unix(),
 	}
 
-	// 6. Sign the token
+	// Sign the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString(s.jwtSecret)
 	if err != nil {

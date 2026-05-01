@@ -15,6 +15,11 @@ type PermissionRepository interface {
     // Standard CRUD for administrative UI
     GetAll(ctx context.Context) ([]*models.Permission, error)
     GetRolePermissions(ctx context.Context, roleID int64) ([]*models.Permission, error)
+
+    // User permission management
+    GrantUserPermission(ctx context.Context, userID int64, permID int64) error
+    RevokeUserPermission(ctx context.Context, userID int64, permID int64) error
+    ReplaceUserPermissions(ctx context.Context, userID int64, permIDs []int64) error
 }
 
 type permissionRepo struct {
@@ -114,4 +119,54 @@ func (r *permissionRepo) GetRolePermissions(ctx context.Context, roleID int64) (
         perms = append(perms, &p)
     }
     return perms, rows.Err()
+}
+
+
+// GrantUserPermission adds a single direct permission to a user.
+func (r *permissionRepo) GrantUserPermission(ctx context.Context, userID int64, permID int64) error {
+    // INSERT OR IGNORE safely handles cases where the user already has this direct grant
+    query := `INSERT OR IGNORE INTO user_permissions (user_id, permission_id) VALUES (?, ?)`
+    _, err := r.db.ExecContext(ctx, query, userID, permID)
+    return err
+}
+
+// RevokeUserPermission removes a single direct permission from a user.
+func (r *permissionRepo) RevokeUserPermission(ctx context.Context, userID int64, permID int64) error {
+    query := `DELETE FROM user_permissions WHERE user_id = ? AND permission_id = ?`
+    _, err := r.db.ExecContext(ctx, query, userID, permID)
+    return err
+}
+
+// ReplaceUserPermissions handles bulk UI updates transactionally.
+// It wipes existing direct grants and inserts the new array.
+func (r *permissionRepo) ReplaceUserPermissions(ctx context.Context, userID int64, permIDs []int64) error {
+    tx, err := r.db.BeginTx(ctx, nil)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback() // Safe to defer; does nothing if tx.Commit() succeeds
+
+    // Wipe existing direct permissions for this user
+    deleteQuery := `DELETE FROM user_permissions WHERE user_id = ?`
+    if _, err := tx.ExecContext(ctx, deleteQuery, userID); err != nil {
+        return err
+    }
+
+    // Insert the new ones, if any
+    if len(permIDs) > 0 {
+        insertQuery := `INSERT INTO user_permissions (user_id, permission_id) VALUES (?, ?)`
+        stmt, err := tx.PrepareContext(ctx, insertQuery)
+        if err != nil {
+            return err
+        }
+        defer stmt.Close()
+
+        for _, permID := range permIDs {
+            if _, err := stmt.ExecContext(ctx, userID, permID); err != nil {
+                return err
+            }
+        }
+    }
+
+    return tx.Commit()
 }
