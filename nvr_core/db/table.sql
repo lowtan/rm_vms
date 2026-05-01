@@ -1,8 +1,10 @@
+PRAGMA foreign_keys = ON;
+
 -- cameras, with ONVIF related columns
 CREATE TABLE IF NOT EXISTS cameras (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    
+
     -- Networking & Discovery
     ip_address TEXT NOT NULL,
     http_port INTEGER DEFAULT 80,
@@ -27,6 +29,7 @@ CREATE TABLE IF NOT EXISTS cameras (
     updated_at INTEGER NOT NULL
 );
 
+-- Segment Recording Table
 CREATE TABLE IF NOT EXISTS segments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     camera_id TEXT NOT NULL,
@@ -44,3 +47,85 @@ CREATE INDEX IF NOT EXISTS idx_segments_timeline ON segments(camera_id, start_ti
 CREATE INDEX IF NOT EXISTS idx_segments_pruning ON segments(start_time);
 
 
+
+
+-- ROLES TABLE
+-- Represents the broad job function (e.g., 'admin', 'supervisor', 'guard', 'guest')
+CREATE TABLE roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- PERMISSIONS TABLE
+-- The granular actions allowed in the system. 
+-- Best practice is using colon-separated domain notation (e.g., 'camera:add', 'timeline:view')
+CREATE TABLE permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- ROLE_PERMISSIONS (Mapping Table)
+-- Dynamically binds many permissions to a role.
+-- If you want to change what a 'guard' can do, you add/remove rows here.
+CREATE TABLE role_permissions (
+    role_id INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE
+) WITHOUT ROWID;
+
+-- USERS TABLE
+-- The actual user accounts. Every user belongs to exactly ONE role.
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL, -- Never store plaintext! Use bcrypt/argon2 in Go
+    role_id INTEGER NOT NULL,
+    is_active BOOLEAN DEFAULT 1, -- Allows instantly disabling a user without deleting their logs
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE RESTRICT
+);
+
+-- USER_CAMERA_ACCESS (Resource-Level Mapping)
+-- NVR Specific: Binds a user to specific cameras. 
+-- If an admin role implicitly sees all cameras, you handle that in Go logic.
+-- But for lower roles, if a row doesn't exist here, the camera is invisible to them.
+CREATE TABLE user_camera_access (
+    user_id INTEGER NOT NULL,
+    camera_id INTEGER NOT NULL, -- References your existing cameras table ID
+    PRIMARY KEY (user_id, camera_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    -- FOREIGN KEY (camera_id) REFERENCES cameras (id) ON DELETE CASCADE
+) WITHOUT ROWID;
+
+-- USER_PERMISSIONS (Direct Grants / Exceptions)
+-- Allows assigning specific actions directly to a user.
+CREATE TABLE user_permissions (
+    user_id INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, permission_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE
+) WITHOUT ROWID;
+
+
+
+-- Part 1: Permissions from the User's Role
+-- SELECT p.code 
+-- FROM users u
+-- JOIN role_permissions rp ON u.role_id = rp.role_id
+-- JOIN permissions p ON rp.permission_id = p.id
+-- WHERE u.id = ? AND u.is_active = 1
+
+-- UNION
+
+-- -- Part 2: Permissions granted directly to the User
+-- SELECT p.code 
+-- FROM users u
+-- JOIN user_permissions up ON u.id = up.user_id
+-- JOIN permissions p ON up.permission_id = p.id
+-- WHERE u.id = ? AND u.is_active = 1;
