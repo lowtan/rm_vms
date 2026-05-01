@@ -10,6 +10,7 @@ import (
 // The API layer knows NOTHING about SQLite or Repositories, only these interfaces.
 // Even though, it's a bridge between API process and Repositories.
 type Services struct {
+	Auth       AuthService
 	Timeline   TimelineService
 	Playback   PlaybackService
 	Playlist   PlaylistService
@@ -22,12 +23,17 @@ type Services struct {
 func NewServices(dbConn *sql.DB) *Services {
 
 	segRepo := repository.NewSegmentRepository(dbConn)
+	userRepo := repository.NewUserRepository(dbConn)
+	permRepo := repository.NewPermissionRepository(dbConn)
 	timelineSvc := NewTimelineService(segRepo)
 	playbackSvc := NewPlaybackService(segRepo)
 	playlistSvc := NewPlaylistService(segRepo)
 	systemSvc := NewSystemService(dbConn, segRepo)
+	// Some random secret key for now
+	authSvc := NewAuthService(userRepo, permRepo, ")($#YHdsJdsx")
 
 	return &Services{
+		Auth:     authSvc,
 		Timeline: timelineSvc,
 		Playback: playbackSvc,
 		Playlist: playlistSvc,

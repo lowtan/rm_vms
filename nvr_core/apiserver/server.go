@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"nvr_core/apiserver/webserver"
 	"nvr_core/apiserver/middleware"
 	"nvr_core/process"
 	"nvr_core/utils"
@@ -52,7 +53,22 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	// Debug Info
 	mux.HandleFunc("GET /debug/db", api.GetDebugInfo)
 
-	// Get camera stream
+	// =============================================
+	// Login
+	// =============================================
+	mux.HandleFunc("POST /api/login", api.HandleLogin)
+
+	// =============================================
+	// Camera Discovery
+	// =============================================
+	mux.HandleFunc("GET /api/scan", api.HandleCameraScan)
+	mux.HandleFunc("GET /api/scansweep", api.HandleCameraSweep)
+	mux.HandleFunc("GET /api/scan/{ip}", api.HandleCameraProbe)
+
+
+	// =============================================
+	// Camera stream
+	// =============================================
 	mux.HandleFunc("GET /ws/stream/{id}", api.GetStream)
 	mux.HandleFunc("GET /live/camera/{id}", api.HandleLiveTransmuxTS)
 
@@ -62,15 +78,28 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("GET /api/cameras", api.GetCameras)
 	mux.HandleFunc("POST /api/cameras", api.AddCamera)
 
+	// =============================================
 	// Timeline and Playback
+	// =============================================
 	mux.HandleFunc("GET /api/cameras/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/play", api.HandlePlayVideo)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/play/ts", api.HandleTransmuxTS)
 
+	// =============================================
 	// Playlist
+	// =============================================
 	mux.HandleFunc("GET /api/cameras/{cam_id}/playlist.m3u8", api.HandleGetPlaylist)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/playlist/ts.m3u8", api.HandleGetTSPlaylist)
 
+
+	// =============================================
+	// Serve Web
+	// =============================================
+	webserver.ServeWeb(mux, cfg)
+
+	// =============================================
+	// =============================================
+	// =============================================
 	addr := fmt.Sprintf(":%d", cfg.Server.Port);
 
 	handlerWithCORS := middleware.CORSMiddleware(mux)
@@ -93,6 +122,9 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 		}
 	}()
 
+	// =============================================
+	// Shutting Down
+	// =============================================
 	// Block this function until the parent context is canceled (SIGTERM/SIGINT)
 	<-ctx.Done()
 
