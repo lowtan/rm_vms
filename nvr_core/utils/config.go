@@ -17,9 +17,11 @@ type Config struct {
 type ServerConfig struct {
 	Port          int    `json:"port"`
 	WebPort       int    `json:"webPort"`
-	DBPath   string `json:"db_path"`
+	DBPath        string `json:"db_path"`
 	StoragePath   string `json:"storage_path"`
+	KeyPath       string `json:"key_path"`
 	RetentionDays int    `json:"retention_days"`
+	masterKey     []byte `json:"-"`
 }
 
 type CameraConfig struct {
@@ -54,4 +56,13 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+
+func (s *ServerConfig) PopulateMasterKey(key []byte) {
+	s.masterKey = key
+}
+
+func (s *ServerConfig) MasterKey() ([]byte) {
+	return s.masterKey
 }

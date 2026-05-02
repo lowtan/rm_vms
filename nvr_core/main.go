@@ -7,8 +7,10 @@ import (
 
 	// Internal Packages
 	"nvr_core/apiserver"
-	"nvr_core/webserver"
 	"nvr_core/db"
+	"nvr_core/security"
+	"nvr_core/webserver"
+
 	// "nvr_core/db/repository"
 	"nvr_core/process"
 	"nvr_core/service"
@@ -30,6 +32,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
+
+	keyPath := cfg.Server.KeyPath
+	if keyPath == "" {
+		keyPath = "./master.key"
+	}
+
+	// Load or generate the key
+	key, err := security.LoadOrCreateMasterKey(keyPath)
+	if err != nil {
+		log.Fatalf("Security initialization failed: %v", err)
+	}
+
+	cfg.Server.PopulateMasterKey(key)
 
 	dbPath := cfg.Server.DBPath+"/nvr_metadata.db"
 

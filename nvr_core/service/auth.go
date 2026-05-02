@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"nvr_core/db/repository"
-	"nvr_core/utils"
+	"nvr_core/security"
 )
 
 var (
@@ -50,7 +50,7 @@ func (s *authServiceBase) Login(ctx context.Context, username, password string) 
 	}
 
 	// Verify bcrypt password hash
-	if !utils.CheckPasswordHash(password, user.Password) {
+	if !security.CheckPasswordHash(password, user.Password) {
 		return "", nil, ErrInvalidCredentials
 	}
 
