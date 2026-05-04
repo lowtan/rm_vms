@@ -82,6 +82,7 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("GET /health/shm/metrics", api.HandleGetSHMMetrics)
 
 	mux.HandleFunc("GET /api/cameras", api.GetCameras)
+	mux.HandleFunc("GET /api/cameras/db", api.GetDBCameras)
 	mux.HandleFunc("POST /api/cameras", api.AddCamera)
 
 	// =============================================

@@ -1,0 +1,233 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"time"
+
+	"nvr_core/db/models"
+)
+
+var (
+	ErrCameraNotFound = errors.New("camera not found")
+	ErrCameraExists   = errors.New("camera id already exists")
+)
+
+type CameraRepository interface {
+	Create(ctx context.Context, cam *models.Camera) error
+	GetByID(ctx context.Context, id string) (*models.Camera, error)
+	GetAll(ctx context.Context) ([]*models.Camera, error)
+	Update(ctx context.Context, cam *models.Camera) error
+	Deactivate(ctx context.Context, id string) error
+}
+
+type cameraRepo struct {
+	db *sql.DB
+}
+
+func NewCameraRepository(db *sql.DB) CameraRepository {
+	return &cameraRepo{db: db}
+}
+
+// Create inserts a new camera. The 'cam.ID' must be pre-generated (e.g., UUID).
+func (r *cameraRepo) Create(ctx context.Context, cam *models.Camera) error {
+	query := `
+		INSERT INTO cameras (
+			id, name, manufacturer, model, serial_number, ip_address, http_port, type, 
+			username, password_enc, stream_url, sub_stream_url, 
+			onvif_profile_token, sub_stream_profile_token, supports_ptz, 
+			retention_gb_limit, is_active, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	now := time.Now().Unix()
+	cam.CreatedAt = now
+	cam.UpdatedAt = now
+
+	// Safely map booleans to SQLite integers
+	supportsPTZ := 0
+	if cam.SupportsPTZ { supportsPTZ = 1 }
+	isActive := 0
+	if cam.IsActive { isActive = 1 }
+
+	_, err := r.db.ExecContext(ctx, query,
+		cam.ID, cam.Name, cam.Manufacturer, cam.Model, cam.SerialNumber,
+		cam.IPAddress, cam.HTTPPort, cam.Type, cam.Username, cam.PasswordEnc,
+		cam.StreamURL, cam.SubStreamURL, cam.OnvifProfileToken, cam.SubStreamProfileToken,
+		supportsPTZ, cam.RetentionGBLimit, isActive, cam.CreatedAt, cam.UpdatedAt,
+	)
+
+	if err != nil {
+		if isUniqueConstraintViolation(err) {
+			return ErrCameraExists 
+		}
+		return err
+	}
+
+	return nil
+}
+
+// GetByID fetches a specific camera and safely handles SQLite NULLs.
+func (r *cameraRepo) GetByID(ctx context.Context, id string) (*models.Camera, error) {
+	query := `
+		SELECT id, name, manufacturer, model, serial_number, ip_address, http_port, type, 
+		       username, password_enc, stream_url, sub_stream_url, 
+		       onvif_profile_token, sub_stream_profile_token, supports_ptz, 
+		       retention_gb_limit, is_active, created_at, updated_at 
+		FROM cameras WHERE id = ?
+	`
+
+	var c models.Camera
+
+	// Temporary variables to hold potentially NULL database columns
+	var manufacturer, model, username, passwordEnc sql.NullString
+	var subStream, onvifToken, subStreamToken sql.NullString
+	var retentionLimit sql.NullInt64
+	var supportsPTZ, isActive int
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&c.ID, &c.Name, &manufacturer, &model, &c.SerialNumber,
+		&c.IPAddress, &c.HTTPPort, &c.Type, &username, &passwordEnc,
+		&c.StreamURL, &subStream, &onvifToken, &subStreamToken,
+		&supportsPTZ, &retentionLimit, &isActive, &c.CreatedAt, &c.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCameraNotFound
+		}
+		return nil, err
+	}
+
+	// Map the safe temporary variables back into the struct pointers
+	if manufacturer.Valid { c.Manufacturer = &manufacturer.String }
+	if model.Valid { c.Model = &model.String }
+	if username.Valid { c.Username = &username.String }
+	if passwordEnc.Valid { c.PasswordEnc = &passwordEnc.String }
+	if subStream.Valid { c.SubStreamURL = &subStream.String }
+	if onvifToken.Valid { c.OnvifProfileToken = &onvifToken.String }
+	if subStreamToken.Valid { c.SubStreamProfileToken = &subStreamToken.String }
+	if retentionLimit.Valid { 
+		limit := int(retentionLimit.Int64)
+		c.RetentionGBLimit = &limit 
+	}
+
+	c.SupportsPTZ = supportsPTZ == 1
+	c.IsActive = isActive == 1
+
+	return &c, nil
+}
+
+// GetAll fetches all cameras to initialize the NVR ingestion workers on startup.
+func (r *cameraRepo) GetAll(ctx context.Context) ([]*models.Camera, error) {
+	query := `
+		SELECT id, name, manufacturer, model, serial_number, ip_address, http_port, type, 
+		       username, password_enc, stream_url, sub_stream_url, 
+		       onvif_profile_token, sub_stream_profile_token, supports_ptz, 
+		       retention_gb_limit, is_active, created_at, updated_at 
+		FROM cameras ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cameras []*models.Camera
+	for rows.Next() {
+		var c models.Camera
+		var manufacturer, model, username, passwordEnc sql.NullString
+		var subStream, onvifToken, subStreamToken sql.NullString
+		var retentionLimit sql.NullInt64
+		var supportsPTZ, isActive int
+
+		if err := rows.Scan(
+			&c.ID, &c.Name, &manufacturer, &model, &c.SerialNumber,
+			&c.IPAddress, &c.HTTPPort, &c.Type, &username, &passwordEnc,
+			&c.StreamURL, &subStream, &onvifToken, &subStreamToken,
+			&supportsPTZ, &retentionLimit, &isActive, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if manufacturer.Valid { c.Manufacturer = &manufacturer.String }
+		if model.Valid { c.Model = &model.String }
+		if username.Valid { c.Username = &username.String }
+		if passwordEnc.Valid { c.PasswordEnc = &passwordEnc.String }
+		if subStream.Valid { c.SubStreamURL = &subStream.String }
+		if onvifToken.Valid { c.OnvifProfileToken = &onvifToken.String }
+		if subStreamToken.Valid { c.SubStreamProfileToken = &subStreamToken.String }
+		if retentionLimit.Valid { 
+			limit := int(retentionLimit.Int64)
+			c.RetentionGBLimit = &limit 
+		}
+		c.SupportsPTZ = supportsPTZ == 1
+		c.IsActive = isActive == 1
+
+		cameras = append(cameras, &c)
+	}
+
+	return cameras, rows.Err()
+}
+
+// Update modifies an existing camera. It automatically updates the 'updated_at' timestamp.
+func (r *cameraRepo) Update(ctx context.Context, cam *models.Camera) error {
+	query := `
+		UPDATE cameras SET 
+			name = ?, manufacturer = ?, model = ?, serial_number = ?, ip_address = ?, http_port = ?, type = ?, 
+			username = ?, password_enc = ?, stream_url = ?, sub_stream_url = ?, 
+			onvif_profile_token = ?, sub_stream_profile_token = ?, supports_ptz = ?, retention_gb_limit = ?, 
+			is_active = ?, updated_at = ?
+		WHERE id = ?
+	`
+
+	cam.UpdatedAt = time.Now().Unix()
+
+	supportsPTZ := 0
+	if cam.SupportsPTZ { supportsPTZ = 1 }
+	isActive := 0
+	if cam.IsActive { isActive = 1 }
+
+	result, err := r.db.ExecContext(ctx, query,
+		cam.Name, cam.Manufacturer, cam.Model, cam.SerialNumber, cam.IPAddress,
+		cam.HTTPPort, cam.Type, cam.Username, cam.PasswordEnc,
+		cam.StreamURL, cam.SubStreamURL, cam.OnvifProfileToken, cam.SubStreamProfileToken,
+		supportsPTZ, cam.RetentionGBLimit, isActive, cam.UpdatedAt, cam.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrCameraNotFound
+	}
+
+	return nil
+}
+
+// Deactivate performs a soft-delete to preserve evidence in the segments table.
+func (r *cameraRepo) Deactivate(ctx context.Context, id string) error {
+	query := `UPDATE cameras SET is_active = 0, updated_at = ? WHERE id = ?`
+
+	result, err := r.db.ExecContext(ctx, query, time.Now().Unix(), id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrCameraNotFound
+	}
+
+	return nil
+}

@@ -14,16 +14,11 @@ type UserManagementService interface {
 	UpdateUserPermissions(ctx context.Context, adminID, targetUserID int64, permIDs []int64) error
 }
 
-type userManagementService struct {
-	userRepo repository.UserRepository
-	permRepo repository.PermissionRepository
-}
-
 func NewUserManagementService(uRepo repository.UserRepository, pRepo repository.PermissionRepository) UserManagementService {
-	return &userManagementService{userRepo: uRepo, permRepo: pRepo}
+	return &userServiceBase{userRepo: uRepo, permRepo: pRepo}
 }
 
-func (s *userManagementService) UpdateUserRole(ctx context.Context, adminID, targetUserID, newRoleID int64) error {
+func (s *userServiceBase) UpdateUserRole(ctx context.Context, adminID, targetUserID, newRoleID int64) error {
 	// Business Rule: Ensure target user actually exists before modifying
 	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
 		return fmt.Errorf("target user verification failed: %w", err)
@@ -31,18 +26,18 @@ func (s *userManagementService) UpdateUserRole(ctx context.Context, adminID, tar
 	return s.userRepo.UpdateRole(ctx, targetUserID, newRoleID)
 }
 
-func (s *userManagementService) GrantPermission(ctx context.Context, adminID, targetUserID, permID int64) error {
+func (s *userServiceBase) GrantPermission(ctx context.Context, adminID, targetUserID, permID int64) error {
 	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
 		return err
 	}
 	return s.permRepo.GrantUserPermission(ctx, targetUserID, permID)
 }
 
-func (s *userManagementService) RevokePermission(ctx context.Context, adminID, targetUserID, permID int64) error {
+func (s *userServiceBase) RevokePermission(ctx context.Context, adminID, targetUserID, permID int64) error {
 	return s.permRepo.RevokeUserPermission(ctx, targetUserID, permID)
 }
 
-func (s *userManagementService) UpdateUserPermissions(ctx context.Context, adminID, targetUserID int64, permIDs []int64) error {
+func (s *userServiceBase) UpdateUserPermissions(ctx context.Context, adminID, targetUserID int64, permIDs []int64) error {
 	if _, err := s.userRepo.GetByID(ctx, targetUserID); err != nil {
 		return err
 	}

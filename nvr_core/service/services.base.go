@@ -13,6 +13,15 @@ type authServiceBase struct {
 	tokenExpir time.Duration
 }
 
+type userServiceBase struct {
+	userRepo repository.UserRepository
+	permRepo repository.PermissionRepository
+}
+
+type cameraServiceBase struct {
+	repo repository.CameraRepository
+}
+
 type segmentServiceBase struct {
 	repo repository.SegmentRepository
 }

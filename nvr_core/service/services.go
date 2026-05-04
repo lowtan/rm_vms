@@ -12,10 +12,10 @@ import (
 type Services struct {
 	Auth       AuthService
 	User       UserManagementService
+	Camera     CameraManagementService
 	Timeline   TimelineService
 	Playback   PlaybackService
 	Playlist   PlaylistService
-	// Camera   service.CameraService
 	System     SystemService
 }
 
@@ -26,6 +26,7 @@ func NewServices(dbConn *sql.DB) *Services {
 	segRepo := repository.NewSegmentRepository(dbConn)
 	userRepo := repository.NewUserRepository(dbConn)
 	permRepo := repository.NewPermissionRepository(dbConn)
+	cameraRepo := repository.NewCameraRepository(dbConn)
 	timelineSvc := NewTimelineService(segRepo)
 	playbackSvc := NewPlaybackService(segRepo)
 	playlistSvc := NewPlaylistService(segRepo)
@@ -33,10 +34,12 @@ func NewServices(dbConn *sql.DB) *Services {
 	// Some random secret key for now
 	authSvc := NewAuthService(userRepo, permRepo, ")($#YHdsJdsx")
 	userSvc := NewUserManagementService(userRepo, permRepo)
+	camSvc := NewCameraManagementService(cameraRepo)
 
 	return &Services{
 		Auth:     authSvc,
 		User:     userSvc,
+		Camera:   camSvc,
 		Timeline: timelineSvc,
 		Playback: playbackSvc,
 		Playlist: playlistSvc,

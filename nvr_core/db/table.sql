@@ -1,35 +1,51 @@
 PRAGMA foreign_keys = ON;
 
--- cameras, with ONVIF related columns
+-- ======================================
+-- Cameras
+-- ======================================
 CREATE TABLE IF NOT EXISTS cameras (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
 
+    -- ONVIF Specific State
+    manufacturer TEXT,
+    model TEXT,
+    serial_number TEXT NOT NULL, -- NOT UNIQUE, handled via index/code
+
     -- Networking & Discovery
     ip_address TEXT NOT NULL,
     http_port INTEGER DEFAULT 80,
-    type TEXT NOT NULL DEFAULT 'onvif', -- 'onvif' or 'rtsp_only'
+    type TEXT NOT NULL DEFAULT 'onvif', 
 
-    -- Authentication (Crucial for ONVIF Control Plane)
+    -- Authentication
     username TEXT,
-    password_enc TEXT, -- NEVER store plaintext NVR passwords
+    password_enc TEXT, 
 
-    -- RTSP Data Plane (Can be dynamically populated via ONVIF)
+    -- RTSP Data Plane
     stream_url TEXT NOT NULL,
-    sub_stream_url TEXT, -- Highly recommended for multi-camera Vue.js grid viewing
+    sub_stream_url TEXT,
 
-    -- ONVIF Specific State
-    onvif_profile_token TEXT, -- e.g., 'Profile_1' (Primary high-res stream)
+    -- ONVIF Control Tokens
+    onvif_profile_token TEXT,
+    sub_stream_profile_token TEXT,
     supports_ptz INTEGER DEFAULT 0,
 
     -- Storage & State
     retention_gb_limit INTEGER,
     is_active INTEGER DEFAULT 1,
+
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
 
+-- Prevents adding the exact same camera hardware twice, but allows 
+-- two cheap cameras with blank serials if they have different IPs.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cam_dedup ON cameras(serial_number, ip_address);
+
+
+-- ======================================
 -- Segment Recording Table
+-- ======================================
 CREATE TABLE IF NOT EXISTS segments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     camera_id TEXT NOT NULL,
@@ -48,6 +64,9 @@ CREATE INDEX IF NOT EXISTS idx_segments_pruning ON segments(start_time);
 
 
 
+-- ======================================
+-- Roles & Permissions
+-- ======================================
 
 -- ROLES TABLE
 -- Represents the broad job function (e.g., 'admin', 'supervisor', 'guard', 'guest')
@@ -78,7 +97,10 @@ CREATE TABLE role_permissions (
     FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
+
+-- ======================================
 -- USERS TABLE
+-- ======================================
 -- The actual user accounts. Every user belongs to exactly ONE role.
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
