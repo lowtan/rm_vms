@@ -39,6 +39,5 @@ func (api *APIServer) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Permissions: perms,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	RespondJSON(w, resp)
 }

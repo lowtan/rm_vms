@@ -1,7 +1,6 @@
 package apiserver
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -43,8 +42,7 @@ func (api *APIServer) GetTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send the JSON payload
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := RespondJSON(w, response); err != nil {
 		log.Printf("[API] Error encoding search response: %v", err)
 	}
 }

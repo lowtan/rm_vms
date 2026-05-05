@@ -3,11 +3,14 @@ package repository
 import (
 	"context"
 	"database/sql"
+	// "fmt"
+
 	// "database/sql"
 	// "errors"
 	// "fmt"
 	// "strings"
 
+	"nvr_core/apiserver/dto"
 	"nvr_core/db/models"
 )
 
@@ -19,7 +22,7 @@ func (r *segmentRepo) GetSegmentsByRange(ctx context.Context, camID string, star
 		WHERE camera_id = ? AND start_time >= ? AND start_time <= ?
 		ORDER BY start_time ASC
 	`
-	
+
 	rows, err := r.db.QueryContext(ctx, query, camID, start, end)
 	if err != nil {
 		return nil, err
@@ -59,4 +62,43 @@ func (r *segmentRepo) GetSegmentAtTime(ctx context.Context, camID string, timest
 	}
 
 	return &seg, nil
+}
+
+// GetDailySummary(ctx context.Context, camID string, startUnix, endUnix int64) ([]dto.DailySummary, error)
+func (r *segmentRepo) GetDailySummary(ctx context.Context, camID string, startUnix, endUnix int64) ([]dto.DailySummary, error) {
+	// The 'localtime' modifier tells SQLite to convert the Unix epoch into the 
+	// server's local timezone before extracting the YYYY-MM-DD date.
+	query := `
+		SELECT 
+			strftime('%Y-%m-%d', start_time, 'unixepoch', 'localtime') AS record_date,
+			SUM(end_time - start_time) AS total_seconds
+		FROM segments
+		WHERE camera_id = ? AND start_time >= ? AND end_time <= ?
+		GROUP BY record_date
+		ORDER BY record_date ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, camID, startUnix, endUnix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summaries []dto.DailySummary
+	for rows.Next() {
+		var s dto.DailySummary
+		if err := rows.Scan(&s.Date, &s.TotalSeconds); err != nil {
+			return nil, err
+		}
+
+		// Format the seconds into HH:MM:SS in Go
+		// h := s.TotalSeconds / 3600
+		// m := (s.TotalSeconds % 3600) / 60
+		// sec := s.TotalSeconds % 60
+		// s.Formatted = fmt.Sprintf("%02d:%02d:%02d", h, m, sec)
+
+		summaries = append(summaries, s)
+	}
+
+	return summaries, rows.Err()
 }

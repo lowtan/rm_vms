@@ -1,7 +1,6 @@
 package apiserver
 
 import (
-	// "context"
 	"context"
 	"encoding/json"
 	"log"
@@ -60,8 +59,7 @@ func (s *APIServer) HandleCameraScan(w http.ResponseWriter, r *http.Request) {
 		result = make([]onvif.DiscoveredCamera, 0)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err := RespondJSON(w, result); err != nil {
 		log.Printf("Error probing camera: %v", err)
 	}
 
@@ -96,8 +94,7 @@ func (s *APIServer) HandleCameraSweep(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return results
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err := RespondJSON(w, result); err != nil {
 		log.Printf("Error encoding results: %v", err)
 	}
 }

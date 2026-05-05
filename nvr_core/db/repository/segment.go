@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"nvr_core/apiserver/dto"
 	"nvr_core/db/models"
 )
 
@@ -25,6 +26,9 @@ type SegmentRepository interface {
 	GetLastSegment(ctx context.Context) (*models.Segment, error)
 	GetSegmentsByRange(ctx context.Context, camID string, start, end int64) ([]*models.Segment, error)
 	GetSegmentAtTime(ctx context.Context, camID string, timestamp int64) (*models.Segment, error)
+
+	// Calendar
+	GetDailySummary(ctx context.Context, camID string, startUnix, endUnix int64) ([]dto.DailySummary, error)
 
 	// Bulk Insert
 	BulkInsert(ctx context.Context, segments []*models.Segment) error

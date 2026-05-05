@@ -9,6 +9,7 @@ import (
 
 type TimelineService interface {
 	GetContiguousBlocks(ctx context.Context, camID string, start, end int64) ([]dto.TimelineBlock, error)
+	GetDailySummary(ctx context.Context, camID string, start, end int64) ([]dto.DailySummary, error)
 }
 
 func NewTimelineService(repo repository.SegmentRepository) TimelineService {
@@ -60,4 +61,8 @@ func (s *segmentServiceBase) GetContiguousBlocks(ctx context.Context, camID stri
 	blocks = append(blocks, currentBlock)
 
 	return blocks, nil
+}
+
+func (s *segmentServiceBase) GetDailySummary(ctx context.Context, camID string, start, end int64) ([]dto.DailySummary, error) {
+	return s.repo.GetDailySummary(ctx, camID, start, end)
 }

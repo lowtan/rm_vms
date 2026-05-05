@@ -30,8 +30,7 @@ func (s *APIServer) GetCameras(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[GetCameras] camList(%d)\n", len(camList))
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(camList); err != nil {
+	if err := RespondJSON(w, camList); err != nil {
 		log.Printf("Error encoding camera list: %v", err)
 		// Connection likely dropped; no need to write http.Error
 	}
@@ -49,8 +48,7 @@ func (s *APIServer) GetDBCameras(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[GetCameras] camList(%d)\n", len(camList))
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(camList); err != nil {
+	if err := RespondJSON(w, camList); err != nil {
 		log.Printf("Error encoding camera list: %v", err)
 		// Connection likely dropped; no need to write http.Error
 	}
@@ -98,9 +96,9 @@ func (s *APIServer) AddCamera(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Send JSON payload via Stdin to the target C++ Worker Subprocess
 
-	w.Header().Set("Content-Type", "application/json")
+
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(newCamera); err != nil {
+	if err := RespondJSON(w, newCamera); err != nil {
 		log.Printf("Error encoding new camera response: %v", err)
 	}
 }

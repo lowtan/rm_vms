@@ -34,5 +34,5 @@ func (api *APIServer) HandleUpdateUserPermissions(w http.ResponseWriter, r *http
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "success"}`))
+	RespondJSON(w, true)
 }

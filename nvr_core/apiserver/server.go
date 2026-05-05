@@ -81,6 +81,9 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("GET /health", api.GetHealth)
 	mux.HandleFunc("GET /health/shm/metrics", api.HandleGetSHMMetrics)
 
+	// =============================================
+	// Camera Management
+	// =============================================
 	mux.HandleFunc("GET /api/cameras", api.GetCameras)
 	mux.HandleFunc("GET /api/cameras/db", api.GetDBCameras)
 	mux.HandleFunc("POST /api/cameras", api.AddCamera)
@@ -91,6 +94,12 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 	mux.HandleFunc("GET /api/cameras/{cam_id}/timeline/{start}/{end}", api.GetTimeline)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/play", api.HandlePlayVideo)
 	mux.HandleFunc("GET /api/cameras/{cam_id}/play/ts", api.HandleTransmuxTS)
+
+	// =============================================
+	// Calendar
+	// =============================================
+	mux.HandleFunc("GET /api/cameras/{cam_id}/summary/{start}/{end}", api.HandleGetDailySummary)
+
 
 	// =============================================
 	// Playlist
@@ -111,7 +120,7 @@ func Initiate(ctx context.Context, cfg *utils.Config, pm *process.Manager, svcs 
 
 	handlerWithCORS := middleware.CORSMiddleware(mux)
 
-	// Production-grade server configuration
+	// Server configuration
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      handlerWithCORS,

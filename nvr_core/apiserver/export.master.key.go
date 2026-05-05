@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 )
 
@@ -30,8 +29,8 @@ func (s *APIServer) HandleExportMasterKey(w http.ResponseWriter, r *http.Request
 		"instructions":   "Store this key in a secure password manager. If the server hardware fails, you will need this exact string to decrypt camera passwords.",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	// w.Header().Set("Content-Type", "application/json")
+	if err := RespondJSON(w, response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
