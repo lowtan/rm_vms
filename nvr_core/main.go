@@ -9,6 +9,7 @@ import (
 	"nvr_core/apiserver"
 	"nvr_core/db"
 	"nvr_core/security"
+	"nvr_core/security/cert"
 	"nvr_core/webserver"
 
 	// "nvr_core/db/repository"
@@ -33,19 +34,6 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	keyPath := cfg.Server.KeyPath
-	if keyPath == "" {
-		keyPath = "./master.key"
-	}
-
-	// Load or generate the key
-	key, err := security.LoadOrCreateMasterKey(keyPath)
-	if err != nil {
-		log.Fatalf("Security initialization failed: %v", err)
-	}
-
-	cfg.Server.PopulateMasterKey(key)
-
 	dbPath := cfg.Server.DBPath+"/nvr_metadata.db"
 
 	log.Println("Attempting to open DB at:", dbPath)
@@ -66,7 +54,7 @@ func main() {
 
 	go apiserver.Initiate(ctx, cfg, pm, servs)
 
-	go webserver.ServeWeb(cfg)
+	// go webserver.ServeWeb(cfg)
 
 	// Block until the context is canceled (SIGINT/SIGTERM received)
 	<-ctx.Done()

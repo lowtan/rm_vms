@@ -3,6 +3,8 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"nvr_core/security"
 	"os"
 )
 
@@ -45,6 +47,10 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config json: %w", err)
 	}
 
+	if cfg.Server.KeyPath == "" {
+		cfg.Server.KeyPath = "./master.key"
+	}
+
 	// (Optional)
 	if cfg.Server.DBPath == "" {
 		cfg.Server.DBPath = "./"
@@ -55,7 +61,22 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Server.StoragePath = "./recordings" // Default fallback
 	}
 
+	cfg.Server.InitMasterKey()
+
 	return &cfg, nil
+}
+
+// Make sure we have valid KeyPath before run this.
+func (s *ServerConfig) InitMasterKey() {
+
+	// Load or generate the key
+	key, err := security.LoadOrCreateMasterKey(s.KeyPath)
+	if err != nil {
+		log.Fatalf("Security initialization failed: %v", err)
+	}
+
+	s.PopulateMasterKey(key)
+
 }
 
 
